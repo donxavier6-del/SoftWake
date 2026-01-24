@@ -11,6 +11,7 @@ import {
   Animated,
   TextInput,
   Platform,
+  Alert,
 } from 'react-native';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import WheelPicker from 'react-native-wheel-scrollview-picker';
@@ -19,6 +20,7 @@ import { Audio } from 'expo-av';
 import { Accelerometer } from 'expo-sensors';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 // Check if running in Expo Go (where push notifications are not supported in SDK 53+)
@@ -71,6 +73,12 @@ type Settings = {
   bedtimeReminderEnabled: boolean;
   bedtimeHour: number;
   bedtimeMinute: number;
+  defaultWakeIntensity: WakeIntensity;
+  defaultSound: AlarmSound;
+  defaultDismissType: DismissType;
+  sleepGoalHours: number;
+  darkMode: boolean;
+  hapticFeedback: boolean;
 };
 
 const SNOOZE_OPTIONS = [
@@ -100,19 +108,17 @@ const SOUND_OPTIONS: { label: string; value: AlarmSound; icon: string }[] = [
 const DISMISS_OPTIONS: { label: string; value: DismissType; icon: string; description: string; isMission?: boolean }[] = [
   { label: 'Simple', value: 'simple', icon: '⏹️', description: 'One tap to dismiss' },
   { label: 'Breathing Exercise', value: 'breathing', icon: '🌬️', description: 'Complete a breathing cycle', isMission: true },
-  { label: 'Type Affirmation', value: 'affirmation', icon: '✨', description: 'Type a positive affirmation', isMission: true },
+  { label: 'Type Affirmation', value: 'affirmation', icon: '✨', description: 'Type an affirmation to dismiss', isMission: true },
   { label: 'Math Problem', value: 'math', icon: '🧮', description: 'Solve a math problem', isMission: true },
   { label: 'Shake Phone', value: 'shake', icon: '📳', description: 'Shake your phone to wake up', isMission: true },
 ];
 
 const SHAKE_THRESHOLD = 1.5;
-const REQUIRED_SHAKES = 5;
+const REQUIRED_SHAKES = 20;
+const BREATHING_CYCLES_REQUIRED = 3;
 
 const AFFIRMATIONS = [
-  'I am ready for a great day',
-  'Today I choose positivity',
-  'I am grateful and energized',
-  'I welcome this new day',
+  'I am ready for today',
 ];
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -121,10 +127,18 @@ const SLEEP_STORAGE_KEY = '@softwake_sleep_data';
 const SETTINGS_STORAGE_KEY = '@softwake_settings';
 const BEDTIME_NOTIFICATION_ID = 'bedtime-reminder';
 
+const SLEEP_GOAL_OPTIONS = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
+
 const DEFAULT_SETTINGS: Settings = {
   bedtimeReminderEnabled: false,
   bedtimeHour: 22,
   bedtimeMinute: 0,
+  defaultWakeIntensity: 'energetic',
+  defaultSound: 'sunrise',
+  defaultDismissType: 'simple',
+  sleepGoalHours: 8,
+  darkMode: true,
+  hapticFeedback: true,
 };
 
 // Premium Wheel Time Picker with smooth scrolling like iOS/Android alarm apps
@@ -387,16 +401,18 @@ export default function App() {
   const [mathProblem, setMathProblem] = useState<MathProblem>(generateMathProblem());
   const [userAnswer, setUserAnswer] = useState('');
   const [wrongAnswer, setWrongAnswer] = useState(false);
+  const [mathComplete, setMathComplete] = useState(false);
 
   // Breathing exercise state
-  const [breathingPhase, setBreathingPhase] = useState<'inhale' | 'hold' | 'exhale' | 'done'>('inhale');
+  const [breathingPhase, setBreathingPhase] = useState<'inhale' | 'hold' | 'exhale' | 'complete'>('inhale');
   const [breathingCycle, setBreathingCycle] = useState(0);
   const breathingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const BREATHING_CYCLES_REQUIRED = 3;
+  const breathingAnim = useRef(new Animated.Value(0.4)).current;
 
   // Affirmation state
   const [affirmationText, setAffirmationText] = useState('');
   const [targetAffirmation, setTargetAffirmation] = useState(AFFIRMATIONS[0]);
+  const [affirmationComplete, setAffirmationComplete] = useState(false);
 
   // New alarm state
   const [selectedHour, setSelectedHour] = useState(8);
@@ -413,6 +429,7 @@ export default function App() {
 
   // Shake detection state
   const [shakeCount, setShakeCount] = useState(0);
+  const [shakeComplete, setShakeComplete] = useState(false);
   const lastShakeTime = useRef<number>(0);
 
   // Sleep tracking state
@@ -430,10 +447,7 @@ export default function App() {
 
   // Settings state
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
-  const [settingsBedtimeHour, setSettingsBedtimeHour] = useState(22);
-  const [settingsBedtimeMinute, setSettingsBedtimeMinute] = useState(0);
-  const [settingsReminderEnabled, setSettingsReminderEnabled] = useState(false);
+  const [bedtimePickerVisible, setBedtimePickerVisible] = useState(false);
 
   // Stats modal state
   const [statsModalVisible, setStatsModalVisible] = useState(false);
@@ -457,8 +471,8 @@ export default function App() {
           setSleepData(JSON.parse(storedSleep));
         }
         if (storedSettings) {
-          const parsedSettings = JSON.parse(storedSettings) as Settings;
-          setSettings(parsedSettings);
+          const parsedSettings = JSON.parse(storedSettings);
+          setSettings({ ...DEFAULT_SETTINGS, ...parsedSettings });
         }
       } catch (error) {
         console.log('Error loading data:', error);
@@ -606,8 +620,9 @@ export default function App() {
       if (totalForce > SHAKE_THRESHOLD && now - lastShakeTime.current > 300) {
         lastShakeTime.current = now;
         setShakeCount((prev) => {
+          if (prev >= REQUIRED_SHAKES) return prev;
           const newCount = prev + 1;
-          if (newCount >= REQUIRED_SHAKES) {
+          if (newCount === REQUIRED_SHAKES) {
             handleShakeDismiss();
           }
           return newCount;
@@ -624,22 +639,22 @@ export default function App() {
 
   const handleShakeDismiss = async () => {
     await stopAlarmSound();
-    setAlarmScreenVisible(false);
-    setShakeCount(0);
-
-    // Store wake time and show bedtime prompt
-    setPendingWakeTime(new Date());
-    setBedtimeHour(22);
-    setBedtimeMinute(0);
-    setBedtimeModalVisible(true);
-
-    // Disable one-time alarms
-    if (activeAlarm && activeAlarm.days.every((d) => !d)) {
-      setAlarms(alarms.map((a) =>
-        a.id === activeAlarm.id ? { ...a, enabled: false } : a
-      ));
-    }
-    setActiveAlarm(null);
+    setShakeComplete(true);
+    setTimeout(() => {
+      setShakeComplete(false);
+      setAlarmScreenVisible(false);
+      setShakeCount(0);
+      setPendingWakeTime(new Date());
+      setBedtimeHour(22);
+      setBedtimeMinute(0);
+      setBedtimeModalVisible(true);
+      if (activeAlarm && activeAlarm.days.every((d) => !d)) {
+        setAlarms(alarms.map((a) =>
+          a.id === activeAlarm.id ? { ...a, enabled: false } : a
+        ));
+      }
+      setActiveAlarm(null);
+    }, 2000);
   };
 
   const handleSimpleDismiss = async () => {
@@ -661,36 +676,59 @@ export default function App() {
     setActiveAlarm(null);
   };
 
+  const animateBreathingCircle = (toValue: number, duration: number) => {
+    Animated.timing(breathingAnim, {
+      toValue,
+      duration,
+      useNativeDriver: false,
+    }).start();
+  };
+
   const startBreathingExercise = () => {
     setBreathingPhase('inhale');
     setBreathingCycle(0);
+    breathingAnim.setValue(0.4);
     let cycle = 0;
-    let phase: 'inhale' | 'hold' | 'exhale' | 'done' = 'inhale';
+    let phase: 'inhale' | 'hold' | 'exhale' | 'complete' = 'inhale';
+
+    // Start first inhale animation
+    animateBreathingCircle(1.0, 4000);
 
     const runPhase = () => {
       if (phase === 'inhale') {
+        // Inhale done -> Hold (7 seconds, circle stays expanded)
         phase = 'hold';
         setBreathingPhase('hold');
-        breathingTimerRef.current = setTimeout(runPhase, 2000);
+        breathingTimerRef.current = setTimeout(runPhase, 7000);
       } else if (phase === 'hold') {
+        // Hold done -> Exhale (8 seconds, circle contracts)
         phase = 'exhale';
         setBreathingPhase('exhale');
-        breathingTimerRef.current = setTimeout(runPhase, 4000);
+        animateBreathingCircle(0.4, 8000);
+        breathingTimerRef.current = setTimeout(runPhase, 8000);
       } else if (phase === 'exhale') {
+        // Exhale done -> next cycle or complete
         cycle++;
         setBreathingCycle(cycle);
         if (cycle >= BREATHING_CYCLES_REQUIRED) {
-          phase = 'done';
-          setBreathingPhase('done');
+          phase = 'complete';
+          setBreathingPhase('complete');
+          // Auto-dismiss after showing "Good morning" for 2 seconds
+          breathingTimerRef.current = setTimeout(() => {
+            handleBreathingDismiss();
+          }, 2500);
         } else {
+          // Start next inhale (4 seconds, circle expands)
           phase = 'inhale';
           setBreathingPhase('inhale');
+          animateBreathingCircle(1.0, 4000);
           breathingTimerRef.current = setTimeout(runPhase, 4000);
         }
       }
     };
 
-    breathingTimerRef.current = setTimeout(runPhase, 4000); // First inhale: 4 seconds
+    // First inhale: 4 seconds
+    breathingTimerRef.current = setTimeout(runPhase, 4000);
   };
 
   const handleBreathingDismiss = async () => {
@@ -712,24 +750,26 @@ export default function App() {
     setActiveAlarm(null);
   };
 
-  const handleAffirmationDismiss = async () => {
-    if (affirmationText.toLowerCase().trim() === targetAffirmation.toLowerCase()) {
+  const handleAffirmationChange = async (text: string) => {
+    setAffirmationText(text);
+    if (text.toLowerCase().trim() === targetAffirmation.toLowerCase()) {
       await stopAlarmSound();
-      setAlarmScreenVisible(false);
-      setAffirmationText('');
-      setPendingWakeTime(new Date());
-      setBedtimeHour(22);
-      setBedtimeMinute(0);
-      setBedtimeModalVisible(true);
-      if (activeAlarm && activeAlarm.days.every((d) => !d)) {
-        setAlarms(alarms.map((a) =>
-          a.id === activeAlarm.id ? { ...a, enabled: false } : a
-        ));
-      }
-      setActiveAlarm(null);
-    } else {
-      setWrongAnswer(true);
-      setTimeout(() => setWrongAnswer(false), 500);
+      setAffirmationComplete(true);
+      setTimeout(() => {
+        setAffirmationComplete(false);
+        setAlarmScreenVisible(false);
+        setAffirmationText('');
+        setPendingWakeTime(new Date());
+        setBedtimeHour(22);
+        setBedtimeMinute(0);
+        setBedtimeModalVisible(true);
+        if (activeAlarm && activeAlarm.days.every((d) => !d)) {
+          setAlarms(alarms.map((a) =>
+            a.id === activeAlarm.id ? { ...a, enabled: false } : a
+          ));
+        }
+        setActiveAlarm(null);
+      }, 2000);
     }
   };
 
@@ -738,9 +778,12 @@ export default function App() {
     setMathProblem(generateMathProblem());
     setUserAnswer('');
     setAffirmationText('');
+    setAffirmationComplete(false);
     setTargetAffirmation(AFFIRMATIONS[Math.floor(Math.random() * AFFIRMATIONS.length)]);
     setWrongAnswer(false);
+    setMathComplete(false);
     setShakeCount(0);
+    setShakeComplete(false);
     setAlarmScreenVisible(true);
 
     if (alarm.dismissType === 'breathing') {
@@ -874,27 +917,29 @@ export default function App() {
     const answer = parseInt(userAnswer, 10);
     if (answer === mathProblem.answer) {
       await stopAlarmSound();
-      setAlarmScreenVisible(false);
-      setUserAnswer('');
-
-      // Store wake time and show bedtime prompt
-      setPendingWakeTime(new Date());
-      // Default bedtime to 10 PM previous night
-      setBedtimeHour(22);
-      setBedtimeMinute(0);
-      setBedtimeModalVisible(true);
-
-      // Disable one-time alarms
-      if (activeAlarm && activeAlarm.days.every((d) => !d)) {
-        setAlarms(alarms.map((a) =>
-          a.id === activeAlarm.id ? { ...a, enabled: false } : a
-        ));
-      }
-      setActiveAlarm(null);
+      setMathComplete(true);
+      setTimeout(() => {
+        setMathComplete(false);
+        setAlarmScreenVisible(false);
+        setUserAnswer('');
+        setPendingWakeTime(new Date());
+        setBedtimeHour(22);
+        setBedtimeMinute(0);
+        setBedtimeModalVisible(true);
+        if (activeAlarm && activeAlarm.days.every((d) => !d)) {
+          setAlarms(alarms.map((a) =>
+            a.id === activeAlarm.id ? { ...a, enabled: false } : a
+          ));
+        }
+        setActiveAlarm(null);
+      }, 2000);
     } else {
       setWrongAnswer(true);
       setUserAnswer('');
-      setTimeout(() => setWrongAnswer(false), 500);
+      setTimeout(() => {
+        setWrongAnswer(false);
+        setMathProblem(generateMathProblem());
+      }, 500);
     }
   };
 
@@ -999,9 +1044,9 @@ export default function App() {
     setSelectedDays([false, false, false, false, false, false, false]);
     setSelectedLabel('');
     setSelectedSnooze(10);
-    setSelectedWakeIntensity('energetic');
-    setSelectedSound('sunrise');
-    setSelectedDismissType('simple');
+    setSelectedWakeIntensity(settings.defaultWakeIntensity);
+    setSelectedSound(settings.defaultSound);
+    setSelectedDismissType(settings.defaultDismissType);
     setModalVisible(true);
   };
 
@@ -1014,8 +1059,8 @@ export default function App() {
     setSelectedSnooze(alarm.snooze);
     setSelectedWakeIntensity(alarm.wakeIntensity || 'energetic');
     setSelectedSound(alarm.sound || 'sunrise');
-    const dismissType = alarm.dismissType === 'off' ? 'simple' : (alarm.dismissType || 'simple');
-    setSelectedDismissType(dismissType as DismissType);
+    const dismissType = (alarm.dismissType as string) === 'off' ? 'simple' : (alarm.dismissType || 'simple');
+    setSelectedDismissType(dismissType);
     setModalVisible(true);
   };
 
@@ -1085,20 +1130,8 @@ export default function App() {
     setAlarms(alarms.filter((alarm) => alarm.id !== id));
   };
 
-  const handleOpenSettings = () => {
-    setSettingsBedtimeHour(settings.bedtimeHour);
-    setSettingsBedtimeMinute(settings.bedtimeMinute);
-    setSettingsReminderEnabled(settings.bedtimeReminderEnabled);
-    setSettingsModalVisible(true);
-  };
-
-  const handleSaveSettings = () => {
-    setSettings({
-      bedtimeReminderEnabled: settingsReminderEnabled,
-      bedtimeHour: settingsBedtimeHour,
-      bedtimeMinute: settingsBedtimeMinute,
-    });
-    setSettingsModalVisible(false);
+  const updateSettings = (partial: Partial<Settings>) => {
+    setSettings((prev) => ({ ...prev, ...partial }));
   };
 
   const formatSettingsTime = (hour: number, minute: number) => {
@@ -1385,12 +1418,40 @@ export default function App() {
 
       {activeTab === 'morning' && (
         <View style={styles.tabContent}>
-          <View style={styles.placeholderScreen}>
-            <Text style={styles.placeholderIcon}>{"☀\uFE0F"}</Text>
-            <Text style={styles.placeholderTitle}>Morning Routine</Text>
-            <Text style={styles.placeholderSubtitle}>
-              Your personalized morning flow will appear here
+          <View style={styles.morningContainer}>
+            <Text style={styles.morningGreeting}>
+              {(() => {
+                const h = new Date().getHours();
+                if (h < 12) return 'Good morning';
+                if (h < 17) return 'Good afternoon';
+                return 'Good evening';
+              })()}
             </Text>
+            <Text style={styles.morningQuote}>
+              "Today is full of possibilities"
+            </Text>
+            <View style={styles.morningButtons}>
+              <TouchableOpacity
+                style={styles.morningButton}
+                onPress={() => {
+                  if (settings.hapticFeedback) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  Alert.alert('Deep Breath', 'Breathe in... hold... breathe out...');
+                }}
+              >
+                <Text style={styles.morningButtonIcon}>🌬️</Text>
+                <Text style={styles.morningButtonLabel}>Deep Breath</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.morningButton}
+                onPress={() => {
+                  if (settings.hapticFeedback) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  Alert.alert('Set Intention', 'What do you want to focus on today?');
+                }}
+              >
+                <Text style={styles.morningButtonIcon}>🎯</Text>
+                <Text style={styles.morningButtonLabel}>Set Intention</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
@@ -1408,15 +1469,188 @@ export default function App() {
       )}
 
       {activeTab === 'settings' && (
-        <View style={styles.tabContent}>
-          <View style={styles.placeholderScreen}>
-            <Text style={styles.placeholderIcon}>{"⚙\uFE0F"}</Text>
-            <Text style={styles.placeholderTitle}>Settings</Text>
-            <Text style={styles.placeholderSubtitle}>
-              Customize your Softwake experience
-            </Text>
+        <ScrollView style={styles.settingsTabContent} showsVerticalScrollIndicator={false}>
+          {/* Alarm Defaults */}
+          <Text style={styles.settingsSectionHeader}>Alarm Defaults</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => {
+                const currentIndex = WAKE_INTENSITY_OPTIONS.findIndex((o) => o.value === settings.defaultWakeIntensity);
+                const nextIndex = (currentIndex + 1) % WAKE_INTENSITY_OPTIONS.length;
+                updateSettings({ defaultWakeIntensity: WAKE_INTENSITY_OPTIONS[nextIndex].value });
+              }}
+            >
+              <Text style={styles.settingsItemLabel}>Wake Intensity</Text>
+              <Text style={styles.settingsItemValue}>
+                {WAKE_INTENSITY_OPTIONS.find((o) => o.value === settings.defaultWakeIntensity)?.label}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.settingsDivider} />
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => {
+                const currentIndex = SOUND_OPTIONS.findIndex((o) => o.value === settings.defaultSound);
+                const nextIndex = (currentIndex + 1) % SOUND_OPTIONS.length;
+                updateSettings({ defaultSound: SOUND_OPTIONS[nextIndex].value });
+              }}
+            >
+              <Text style={styles.settingsItemLabel}>Sound</Text>
+              <Text style={styles.settingsItemValue}>
+                {SOUND_OPTIONS.find((o) => o.value === settings.defaultSound)?.label}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.settingsDivider} />
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => {
+                const currentIndex = DISMISS_OPTIONS.findIndex((o) => o.value === settings.defaultDismissType);
+                const nextIndex = (currentIndex + 1) % DISMISS_OPTIONS.length;
+                updateSettings({ defaultDismissType: DISMISS_OPTIONS[nextIndex].value });
+              }}
+            >
+              <Text style={styles.settingsItemLabel}>Dismiss Method</Text>
+              <Text style={styles.settingsItemValue}>
+                {DISMISS_OPTIONS.find((o) => o.value === settings.defaultDismissType)?.label}
+              </Text>
+            </TouchableOpacity>
           </View>
-        </View>
+
+          {/* Sleep */}
+          <Text style={styles.settingsSectionHeader}>Sleep</Text>
+          <View style={styles.settingsCard}>
+            <View style={styles.settingsItemRow}>
+              <View style={styles.settingsItemLabelContainer}>
+                <Text style={styles.settingsItemLabel}>Bedtime Reminder</Text>
+                {settings.bedtimeReminderEnabled && (
+                  <Text style={styles.settingsItemSubtext}>
+                    Reminder at {formatSettingsTime(
+                      settings.bedtimeMinute < 30
+                        ? (settings.bedtimeHour === 0 ? 23 : settings.bedtimeHour - 1)
+                        : settings.bedtimeHour,
+                      settings.bedtimeMinute < 30
+                        ? settings.bedtimeMinute + 30
+                        : settings.bedtimeMinute - 30
+                    )}
+                  </Text>
+                )}
+              </View>
+              <Switch
+                value={settings.bedtimeReminderEnabled}
+                onValueChange={(val) => {
+                  updateSettings({ bedtimeReminderEnabled: val });
+                  if (val) setBedtimePickerVisible(true);
+                }}
+                trackColor={{ false: '#2A2A2A', true: '#818CF8' }}
+                thumbColor={settings.bedtimeReminderEnabled ? '#FFFFFF' : '#666666'}
+              />
+            </View>
+            {settings.bedtimeReminderEnabled && bedtimePickerVisible && (
+              <>
+                <View style={styles.settingsDivider} />
+                <View style={styles.settingsBedtimePicker}>
+                  <Text style={styles.settingsPickerLabel}>Target Bedtime</Text>
+                  <TimePicker
+                    hour={settings.bedtimeHour}
+                    minute={settings.bedtimeMinute}
+                    onHourChange={(h) => updateSettings({ bedtimeHour: h })}
+                    onMinuteChange={(m) => updateSettings({ bedtimeMinute: m })}
+                    minuteStep={5}
+                  />
+                </View>
+              </>
+            )}
+            {settings.bedtimeReminderEnabled && !bedtimePickerVisible && (
+              <>
+                <View style={styles.settingsDivider} />
+                <TouchableOpacity
+                  style={styles.settingsItem}
+                  onPress={() => setBedtimePickerVisible(true)}
+                >
+                  <Text style={styles.settingsItemLabel}>Target Bedtime</Text>
+                  <Text style={styles.settingsItemValue}>
+                    {formatSettingsTime(settings.bedtimeHour, settings.bedtimeMinute)}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <View style={styles.settingsDivider} />
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => {
+                const currentIndex = SLEEP_GOAL_OPTIONS.indexOf(settings.sleepGoalHours);
+                const nextIndex = (currentIndex + 1) % SLEEP_GOAL_OPTIONS.length;
+                updateSettings({ sleepGoalHours: SLEEP_GOAL_OPTIONS[nextIndex] });
+              }}
+            >
+              <Text style={styles.settingsItemLabel}>Sleep Goal</Text>
+              <Text style={styles.settingsItemValue}>
+                {settings.sleepGoalHours % 1 === 0
+                  ? `${settings.sleepGoalHours} hours`
+                  : `${Math.floor(settings.sleepGoalHours)}h ${(settings.sleepGoalHours % 1) * 60}m`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* App */}
+          <Text style={styles.settingsSectionHeader}>App</Text>
+          <View style={styles.settingsCard}>
+            <View style={styles.settingsItemRow}>
+              <Text style={styles.settingsItemLabel}>Dark Mode</Text>
+              <Switch
+                value={settings.darkMode}
+                onValueChange={(val) => updateSettings({ darkMode: val })}
+                trackColor={{ false: '#2A2A2A', true: '#818CF8' }}
+                thumbColor={settings.darkMode ? '#FFFFFF' : '#666666'}
+              />
+            </View>
+            <View style={styles.settingsDivider} />
+            <View style={styles.settingsItemRow}>
+              <Text style={styles.settingsItemLabel}>Haptic Feedback</Text>
+              <Switch
+                value={settings.hapticFeedback}
+                onValueChange={(val) => updateSettings({ hapticFeedback: val })}
+                trackColor={{ false: '#2A2A2A', true: '#818CF8' }}
+                thumbColor={settings.hapticFeedback ? '#FFFFFF' : '#666666'}
+              />
+            </View>
+          </View>
+
+          {/* About */}
+          <Text style={styles.settingsSectionHeader}>About</Text>
+          <View style={styles.settingsCard}>
+            <View style={styles.settingsItem}>
+              <Text style={styles.settingsItemLabel}>Version</Text>
+              <Text style={styles.settingsItemValue}>1.0.0</Text>
+            </View>
+            <View style={styles.settingsDivider} />
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => Alert.alert('Rate Softwake', 'This will open the app store. (Coming soon)')}
+            >
+              <Text style={styles.settingsItemLabel}>Rate Softwake</Text>
+              <Text style={styles.settingsItemChevron}>›</Text>
+            </TouchableOpacity>
+            <View style={styles.settingsDivider} />
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => Alert.alert('Send Feedback', 'Feedback form coming soon.')}
+            >
+              <Text style={styles.settingsItemLabel}>Send Feedback</Text>
+              <Text style={styles.settingsItemChevron}>›</Text>
+            </TouchableOpacity>
+            <View style={styles.settingsDivider} />
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => Alert.alert('Privacy Policy', 'Privacy policy page coming soon.')}
+            >
+              <Text style={styles.settingsItemLabel}>Privacy Policy</Text>
+              <Text style={styles.settingsItemChevron}>›</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.settingsFooter} />
+        </ScrollView>
       )}
 
       {/* Bottom Tab Bar */}
@@ -1712,6 +1946,165 @@ export default function App() {
         visible={alarmScreenVisible}
         onRequestClose={() => {}}
       >
+        {activeAlarm?.dismissType === 'breathing' ? (
+          <LinearGradient
+            colors={['#1a1a3e', '#2d1b69', '#1a3a5c']}
+            style={styles.breathingScreen}
+          >
+            {breathingPhase === 'complete' ? (
+              <View style={styles.breathingCompleteContainer}>
+                <Text style={styles.breathingGoodMorning}>Good morning</Text>
+                {activeAlarm?.label ? (
+                  <Text style={styles.breathingCompleteLabel}>{activeAlarm.label}</Text>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.breathingContent}>
+                <Text style={styles.breathingTimeText}>
+                  {activeAlarm ? formatAlarmTime(activeAlarm.hour, activeAlarm.minute) : ''}
+                </Text>
+                <View style={styles.breathingCircleContainer}>
+                  <Animated.View
+                    style={[
+                      styles.breathingCircle,
+                      {
+                        transform: [{ scale: breathingAnim }],
+                        opacity: breathingAnim.interpolate({
+                          inputRange: [0.4, 1.0],
+                          outputRange: [0.6, 1.0],
+                        }),
+                      },
+                    ]}
+                  />
+                  <View style={styles.breathingCircleInner}>
+                    <Text style={styles.breathingPhaseLabel}>
+                      {breathingPhase === 'inhale' && 'Breathe in'}
+                      {breathingPhase === 'hold' && 'Hold'}
+                      {breathingPhase === 'exhale' && 'Breathe out'}
+                    </Text>
+                    <Text style={styles.breathingPhaseDuration}>
+                      {breathingPhase === 'inhale' && '4 seconds'}
+                      {breathingPhase === 'hold' && '7 seconds'}
+                      {breathingPhase === 'exhale' && '8 seconds'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.breathingCycleProgress}>
+                  Breath {breathingCycle + 1} of {BREATHING_CYCLES_REQUIRED}
+                </Text>
+              </View>
+            )}
+          </LinearGradient>
+        ) : activeAlarm?.dismissType === 'affirmation' ? (
+          <LinearGradient
+            colors={['#0a0a1a', '#1a1a2e', '#0f0f23']}
+            style={styles.affirmationScreen}
+          >
+            {affirmationComplete ? (
+              <View style={styles.affirmationCompleteContainer}>
+                <Text style={styles.affirmationWellDone}>Well done</Text>
+              </View>
+            ) : (
+              <View style={styles.affirmationContent}>
+                <Text style={styles.affirmationPrompt}>Type to start your day</Text>
+                <View style={styles.affirmationTargetContainer}>
+                  <View style={styles.affirmationCharRow}>
+                    {targetAffirmation.split('').map((char, index) => {
+                      const isTyped = index < affirmationText.length;
+                      const isCorrect = isTyped && affirmationText[index]?.toLowerCase() === char.toLowerCase();
+                      const isWrong = isTyped && !isCorrect;
+                      return (
+                        <Text
+                          key={index}
+                          style={[
+                            styles.affirmationChar,
+                            isCorrect && styles.affirmationCharCorrect,
+                            isWrong && styles.affirmationCharWrong,
+                          ]}
+                        >
+                          {char}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                </View>
+                <TextInput
+                  style={styles.affirmationInput}
+                  value={affirmationText}
+                  onChangeText={handleAffirmationChange}
+                  placeholder="Start typing..."
+                  placeholderTextColor="rgba(255, 255, 255, 0.3)"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                />
+              </View>
+            )}
+          </LinearGradient>
+        ) : activeAlarm?.dismissType === 'shake' ? (
+          <LinearGradient
+            colors={['#0a0a1a', '#1a1a2e', '#0f0f23']}
+            style={styles.shakeScreen}
+          >
+            {shakeComplete ? (
+              <View style={styles.shakeCompleteContainer}>
+                <Text style={styles.shakeCompleteText}>You're awake!</Text>
+              </View>
+            ) : (
+              <View style={styles.shakeContent}>
+                <Text style={styles.shakePrompt}>Shake your phone to wake up</Text>
+                <Text style={styles.shakeScreenIcon}>📳</Text>
+                <View style={styles.shakeProgressContainer}>
+                  <View style={styles.shakeProgressBar}>
+                    <View
+                      style={[
+                        styles.shakeProgressFill,
+                        { width: `${(shakeCount / REQUIRED_SHAKES) * 100}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.shakeProgressText}>
+                    {shakeCount} / {REQUIRED_SHAKES}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </LinearGradient>
+        ) : activeAlarm?.dismissType === 'math' ? (
+          <LinearGradient
+            colors={['#0a0a1a', '#1a1a2e', '#0f0f23']}
+            style={styles.mathScreen}
+          >
+            {mathComplete ? (
+              <View style={styles.mathCompleteContainer}>
+                <Text style={styles.mathCompleteText}>Correct!</Text>
+              </View>
+            ) : (
+              <View style={styles.mathContent}>
+                <Text style={styles.mathPrompt}>Solve to start your day</Text>
+                <Text style={styles.mathProblemText}>{mathProblem.question} = ?</Text>
+                <TextInput
+                  style={[
+                    styles.mathInputField,
+                    wrongAnswer && styles.mathInputFieldWrong,
+                  ]}
+                  value={userAnswer}
+                  onChangeText={setUserAnswer}
+                  keyboardType="number-pad"
+                  placeholder="Your answer"
+                  placeholderTextColor="rgba(255, 255, 255, 0.3)"
+                  autoFocus
+                />
+                <TouchableOpacity
+                  style={styles.mathSubmitButton}
+                  onPress={handleDismissAlarm}
+                >
+                  <Text style={styles.mathSubmitButtonText}>Submit</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </LinearGradient>
+        ) : (
         <View style={styles.alarmScreen}>
           <Text style={styles.alarmScreenTime}>
             {activeAlarm ? formatAlarmTime(activeAlarm.hour, activeAlarm.minute) : ''}
@@ -1719,105 +2112,14 @@ export default function App() {
           {activeAlarm?.label ? (
             <Text style={styles.alarmScreenLabel}>{activeAlarm.label}</Text>
           ) : null}
-
-          {(activeAlarm?.dismissType === 'simple' || activeAlarm?.dismissType === 'off') ? (
-            <View style={styles.simpleDismissContainer}>
-              <TouchableOpacity
-                style={styles.stopButton}
-                onPress={handleSimpleDismiss}
-              >
-                <Text style={styles.stopButtonText}>Stop</Text>
-              </TouchableOpacity>
-            </View>
-          ) : activeAlarm?.dismissType === 'breathing' ? (
-            <View style={styles.breathingContainer}>
-              <Text style={styles.breathingTitle}>
-                {breathingPhase === 'done' ? 'Well done!' : 'Breathe'}
-              </Text>
-              <Text style={styles.breathingPhaseText}>
-                {breathingPhase === 'inhale' && 'Breathe in...'}
-                {breathingPhase === 'hold' && 'Hold...'}
-                {breathingPhase === 'exhale' && 'Breathe out...'}
-                {breathingPhase === 'done' && 'Exercise complete'}
-              </Text>
-              <Text style={styles.breathingProgress}>
-                {breathingCycle} / {BREATHING_CYCLES_REQUIRED} cycles
-              </Text>
-              {breathingPhase === 'done' && (
-                <TouchableOpacity
-                  style={styles.dismissButton}
-                  onPress={handleBreathingDismiss}
-                >
-                  <Text style={styles.dismissButtonText}>Dismiss</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : activeAlarm?.dismissType === 'affirmation' ? (
-            <View style={styles.affirmationContainer}>
-              <Text style={styles.affirmationTitle}>Type to dismiss</Text>
-              <Text style={styles.affirmationTarget}>"{targetAffirmation}"</Text>
-              <TextInput
-                style={[
-                  styles.mathInput,
-                  wrongAnswer && styles.mathInputWrong,
-                ]}
-                value={affirmationText}
-                onChangeText={setAffirmationText}
-                placeholder="Type the affirmation"
-                placeholderTextColor="#444444"
-                autoCapitalize="none"
-                autoFocus
-              />
-              <TouchableOpacity
-                style={styles.dismissButton}
-                onPress={handleAffirmationDismiss}
-              >
-                <Text style={styles.dismissButtonText}>Dismiss</Text>
-              </TouchableOpacity>
-            </View>
-          ) : activeAlarm?.dismissType === 'shake' ? (
-            <View style={styles.shakeContainer}>
-              <Text style={styles.shakeTitle}>Shake to dismiss</Text>
-              <Text style={styles.shakeIcon}>📳</Text>
-              <View style={styles.shakeProgressContainer}>
-                <View style={styles.shakeProgressBar}>
-                  <View
-                    style={[
-                      styles.shakeProgressFill,
-                      { width: `${(shakeCount / REQUIRED_SHAKES) * 100}%` },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.shakeProgressText}>
-                  {shakeCount} / {REQUIRED_SHAKES} shakes
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.mathContainer}>
-              <Text style={styles.mathTitle}>Solve to dismiss</Text>
-              <Text style={styles.mathProblem}>{mathProblem.question} = ?</Text>
-              <TextInput
-                style={[
-                  styles.mathInput,
-                  wrongAnswer && styles.mathInputWrong,
-                ]}
-                value={userAnswer}
-                onChangeText={setUserAnswer}
-                keyboardType="number-pad"
-                placeholder="Answer"
-                placeholderTextColor="#444444"
-                autoFocus
-              />
-              <TouchableOpacity
-                style={styles.dismissButton}
-                onPress={handleDismissAlarm}
-              >
-                <Text style={styles.dismissButtonText}>Dismiss</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
+          <View style={styles.simpleDismissContainer}>
+            <TouchableOpacity
+              style={styles.stopButton}
+              onPress={handleSimpleDismiss}
+            >
+              <Text style={styles.stopButtonText}>Stop</Text>
+            </TouchableOpacity>
+          </View>
           {activeAlarm && activeAlarm.snooze > 0 && (
             <TouchableOpacity
               style={styles.snoozeButton}
@@ -1829,6 +2131,7 @@ export default function App() {
             </TouchableOpacity>
           )}
         </View>
+        )}
       </Modal>
 
       {/* Bedtime Logging Modal */}
@@ -1917,68 +2220,7 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* Settings Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={settingsModalVisible}
-        onRequestClose={() => setSettingsModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.settingsModalContent}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setSettingsModalVisible(false)}>
-                <Text style={styles.cancelButton}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>Settings</Text>
-              <TouchableOpacity onPress={handleSaveSettings}>
-                <Text style={styles.saveButton}>Save</Text>
-              </TouchableOpacity>
-            </View>
 
-            <View style={styles.settingsSection}>
-              <View style={styles.settingsRow}>
-                <View style={styles.settingsLabelContainer}>
-                  <Text style={styles.settingsLabel}>Bedtime Reminder</Text>
-                  <Text style={styles.settingsDescription}>
-                    Get notified 30 min before bedtime
-                  </Text>
-                </View>
-                <Switch
-                  value={settingsReminderEnabled}
-                  onValueChange={setSettingsReminderEnabled}
-                  trackColor={{ false: '#2A2A2A', true: '#818CF8' }}
-                  thumbColor={settingsReminderEnabled ? '#FFFFFF' : '#666666'}
-                />
-              </View>
-
-              {settingsReminderEnabled && (
-                <View style={styles.settingsBedtimeSection}>
-                  <Text style={styles.settingsBedtimeLabel}>Target Bedtime</Text>
-                  <TimePicker
-                    hour={settingsBedtimeHour}
-                    minute={settingsBedtimeMinute}
-                    onHourChange={setSettingsBedtimeHour}
-                    onMinuteChange={setSettingsBedtimeMinute}
-                    minuteStep={5}
-                  />
-
-                  <Text style={styles.settingsReminderInfo}>
-                    You'll receive a reminder at {formatSettingsTime(
-                      settingsBedtimeMinute < 30
-                        ? (settingsBedtimeHour === 0 ? 23 : settingsBedtimeHour - 1)
-                        : settingsBedtimeHour,
-                      settingsBedtimeMinute < 30
-                        ? settingsBedtimeMinute + 30
-                        : settingsBedtimeMinute - 30
-                    )}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Sleep Stats Modal */}
       <Modal
@@ -2324,6 +2566,48 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
+  morningContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  morningGreeting: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  morningQuote: {
+    fontSize: 16,
+    color: '#9999AA',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 48,
+  },
+  morningButtons: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  morningButton: {
+    backgroundColor: 'rgba(129, 140, 248, 0.15)',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(129, 140, 248, 0.3)',
+    minWidth: 130,
+  },
+  morningButtonIcon: {
+    fontSize: 28,
+    marginBottom: 8,
+  },
+  morningButtonLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#818CF8',
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -2619,53 +2903,91 @@ const styles = StyleSheet.create({
     color: '#666666',
     marginBottom: 60,
   },
-  mathContainer: {
+  mathScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  mathContent: {
     width: '100%',
     alignItems: 'center',
   },
-  mathTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 20,
+  mathPrompt: {
+    fontSize: 18,
+    fontWeight: '300',
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 32,
+    letterSpacing: 0.5,
   },
-  mathProblem: {
+  mathProblemText: {
     fontSize: 48,
     fontWeight: '300',
     color: '#FFFFFF',
-    marginBottom: 30,
+    marginBottom: 40,
   },
-  mathInput: {
+  mathInputField: {
     width: '100%',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 16,
     paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingVertical: 18,
     fontSize: 32,
     color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  mathInputWrong: {
-    backgroundColor: '#2A2545',
+  mathInputFieldWrong: {
+    borderColor: '#F87171',
+    backgroundColor: 'rgba(248, 113, 113, 0.1)',
   },
-  shakeContainer: {
+  mathSubmitButton: {
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  mathSubmitButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  mathCompleteContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mathCompleteText: {
+    fontSize: 32,
+    fontWeight: '300',
+    color: '#4ADE80',
+    letterSpacing: 1,
+  },
+  shakeScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  shakeContent: {
     width: '100%',
     alignItems: 'center',
   },
-  shakeTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 30,
-  },
-  shakeIcon: {
-    fontSize: 80,
+  shakePrompt: {
+    fontSize: 18,
+    fontWeight: '300',
+    color: 'rgba(255, 255, 255, 0.6)',
     marginBottom: 40,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  shakeScreenIcon: {
+    fontSize: 80,
+    marginBottom: 48,
   },
   shakeProgressContainer: {
     width: '100%',
@@ -2674,32 +2996,30 @@ const styles = StyleSheet.create({
   shakeProgressBar: {
     width: '100%',
     height: 8,
-    backgroundColor: '#2A2A2A',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 16,
   },
   shakeProgressFill: {
     height: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#818CF8',
     borderRadius: 4,
   },
   shakeProgressText: {
     fontSize: 18,
-    color: '#666666',
+    color: 'rgba(255, 255, 255, 0.5)',
     fontWeight: '500',
   },
-  dismissButton: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 18,
+  shakeCompleteContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  dismissButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#0D0D0D',
+  shakeCompleteText: {
+    fontSize: 32,
+    fontWeight: '300',
+    color: '#4ADE80',
+    letterSpacing: 1,
   },
   simpleDismissContainer: {
     width: '100%',
@@ -2725,47 +3045,135 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 2,
   },
-  breathingContainer: {
-    width: '100%',
+  breathingScreen: {
+    flex: 1,
     alignItems: 'center',
-    marginTop: 40,
+    justifyContent: 'center',
+    padding: 24,
   },
-  breathingTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 16,
-  },
-  breathingPhaseText: {
-    fontSize: 22,
-    fontWeight: '500',
-    color: '#818CF8',
-    marginBottom: 24,
-  },
-  breathingProgress: {
-    fontSize: 16,
-    color: '#666666',
-    marginBottom: 24,
-  },
-  affirmationContainer: {
-    width: '100%',
+  breathingContent: {
+    flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 24,
-    marginTop: 40,
+    justifyContent: 'center',
+    width: '100%',
   },
-  affirmationTitle: {
-    fontSize: 20,
+  breathingTimeText: {
+    fontSize: 48,
+    fontWeight: '200',
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 40,
+  },
+  breathingCircleContainer: {
+    width: 220,
+    height: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 48,
+  },
+  breathingCircle: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(129, 140, 248, 0.25)',
+    borderWidth: 2,
+    borderColor: 'rgba(129, 140, 248, 0.6)',
+  },
+  breathingCircleInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  breathingPhaseLabel: {
+    fontSize: 24,
     fontWeight: '600',
     color: '#FFFFFF',
-    marginBottom: 16,
+    marginBottom: 8,
   },
-  affirmationTarget: {
-    fontSize: 18,
+  breathingPhaseDuration: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  breathingCycleProgress: {
+    fontSize: 16,
     fontWeight: '500',
-    color: '#818CF8',
-    fontStyle: 'italic',
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  breathingCompleteContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  breathingGoodMorning: {
+    fontSize: 36,
+    fontWeight: '300',
+    color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  breathingCompleteLabel: {
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  affirmationScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  affirmationContent: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  affirmationPrompt: {
+    fontSize: 18,
+    fontWeight: '300',
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 32,
+    letterSpacing: 0.5,
+  },
+  affirmationTargetContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 40,
+    paddingHorizontal: 8,
+  },
+  affirmationCharRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  affirmationChar: {
+    fontSize: 28,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.4)',
+    letterSpacing: 1,
+  },
+  affirmationCharCorrect: {
+    color: '#4ADE80',
+  },
+  affirmationCharWrong: {
+    color: '#F87171',
+  },
+  affirmationInput: {
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    fontSize: 18,
+    color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  affirmationCompleteContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  affirmationWellDone: {
+    fontSize: 32,
+    fontWeight: '300',
+    color: '#4ADE80',
+    letterSpacing: 1,
   },
   snoozeButton: {
     marginTop: 16,
@@ -2877,55 +3285,84 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666666',
   },
-  // Settings Modal Styles
-  settingsModalContent: {
+  // Settings Tab Styles
+  settingsTabContent: {
+    flex: 1,
+    backgroundColor: '#0D0D0D',
+    paddingHorizontal: 16,
+    paddingTop: 60,
+  },
+  settingsSectionHeader: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#818CF8',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+    marginTop: 24,
+    marginLeft: 4,
+  },
+  settingsCard: {
     backgroundColor: '#1A1A1A',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 40,
-    marginTop: 'auto',
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  settingsSection: {
-    padding: 20,
-  },
-  settingsRow: {
+  settingsItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
-  settingsLabelContainer: {
+  settingsItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  settingsItemLabelContainer: {
     flex: 1,
-    marginRight: 16,
+    marginRight: 12,
   },
-  settingsLabel: {
+  settingsItemLabel: {
     fontSize: 16,
-    fontWeight: '500',
     color: '#FFFFFF',
   },
-  settingsDescription: {
+  settingsItemValue: {
+    fontSize: 16,
+    color: '#818CF8',
+    fontWeight: '500',
+  },
+  settingsItemSubtext: {
     fontSize: 13,
     color: '#666666',
-    marginTop: 4,
+    marginTop: 2,
   },
-  settingsBedtimeSection: {
-    marginTop: 24,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#2A2A2A',
+  settingsItemChevron: {
+    fontSize: 22,
+    color: '#666666',
+    fontWeight: '300',
   },
-  settingsBedtimeLabel: {
+  settingsDivider: {
+    height: 1,
+    backgroundColor: '#2A2A2A',
+    marginLeft: 16,
+  },
+  settingsBedtimePicker: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  settingsPickerLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#666666',
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  settingsReminderInfo: {
-    fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
-    marginTop: 16,
+  settingsFooter: {
+    height: 100,
   },
   // Sleep Stats Modal Styles
   statsModalContent: {
