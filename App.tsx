@@ -14,6 +14,7 @@ import {
   AppState,
   Alert,
 } from 'react-native';
+import type { Alarm, SleepEntry, Settings, AlarmSound, DismissType, WakeIntensity, TabName, WeeklyDataPoint, SleepStatsResult } from './src/types';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import WheelPicker from 'react-native-wheel-scrollview-picker';
 import * as Haptics from 'expo-haptics';
@@ -25,6 +26,31 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { nativeAlarm } from './src/services/nativeAlarm';
 import { rescheduleAllAlarms, cleanupExpiredAlarms } from './src/services/alarmStorage';
+import {
+  SNOOZE_OPTIONS,
+  WAKE_INTENSITY_OPTIONS,
+  SOUND_OPTIONS,
+  DISMISS_OPTIONS,
+  DAYS,
+  AFFIRMATIONS,
+  SLEEP_GOAL_OPTIONS,
+} from './src/constants/options';
+import {
+  formatTimeHHMM,
+  formatTimeWithPeriod,
+  formatTimeObject,
+  formatTimeDisplay,
+} from './src/utils/timeFormatting';
+import { InsightsChart } from './src/components/InsightsChart';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { SettingsPanel } from './src/components/SettingsPanel';
+import { AlarmsList } from './src/components/AlarmsList';
+import { AlarmEditor } from './src/components/AlarmEditor';
+import { TimePicker } from './src/components/TimePicker';
+import { useAlarms } from './src/hooks/useAlarms';
+import { useSettings } from './src/hooks/useSettings';
+import { useAlarmSound } from './src/hooks/useAlarmSound';
+import { useSleepTracking } from './src/hooks/useSleepTracking';
 
 // Check if running in Expo Go (where push notifications are not supported in SDK 53+)
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -56,96 +82,19 @@ if (!isExpoGo) {
   }
 }
 
-type AlarmSound = 'sunrise' | 'ocean' | 'forest' | 'chimes' | 'piano' | 'birds';
-type DismissType = 'simple' | 'breathing' | 'affirmation' | 'math' | 'shake';
-type WakeIntensity = 'whisper' | 'gentle' | 'moderate' | 'energetic';
-type TabName = 'alarms' | 'morning' | 'insights' | 'settings';
-
-type Alarm = {
-  id: string;
-  hour: number;
-  minute: number;
-  days: boolean[];
-  enabled: boolean;
-  label: string;
-  snooze: number;
-  wakeIntensity: WakeIntensity;
-  sound: AlarmSound;
-  dismissType: DismissType;
-};
-
 type MathProblem = {
   question: string;
   answer: number;
 };
 
-type SleepEntry = {
-  id: string;
-  bedtime: number; // timestamp
-  wakeTime: number; // timestamp
-  sleepDuration: number; // minutes
-};
-
-type Settings = {
-  bedtimeReminderEnabled: boolean;
-  bedtimeHour: number;
-  bedtimeMinute: number;
-  defaultWakeIntensity: WakeIntensity;
-  defaultSound: AlarmSound;
-  defaultDismissType: DismissType;
-  sleepGoalHours: number;
-  darkMode: boolean;
-  hapticFeedback: boolean;
-};
-
-const SNOOZE_OPTIONS = [
-  { label: 'Off', value: 0 },
-  { label: '5 min', value: 5 },
-  { label: '10 min', value: 10 },
-  { label: '15 min', value: 15 },
-  { label: '30 min', value: 30 },
-];
-
-const WAKE_INTENSITY_OPTIONS: { label: string; value: WakeIntensity; volume: number }[] = [
-  { label: 'Whisper', value: 'whisper', volume: 0.3 },
-  { label: 'Gentle', value: 'gentle', volume: 0.5 },
-  { label: 'Moderate', value: 'moderate', volume: 0.75 },
-  { label: 'Energetic', value: 'energetic', volume: 1.0 },
-];
-
-const SOUND_OPTIONS: { label: string; value: AlarmSound; icon: string }[] = [
-  { label: 'Sunrise', value: 'sunrise', icon: '☀️' },
-  { label: 'Ocean', value: 'ocean', icon: '🌊' },
-  { label: 'Forest', value: 'forest', icon: '🌲' },
-  { label: 'Chimes', value: 'chimes', icon: '🔔' },
-  { label: 'Soft Piano', value: 'piano', icon: '🎹' },
-  { label: 'Birds', value: 'birds', icon: '🐦' },
-];
-
-const DISMISS_OPTIONS: { label: string; value: DismissType; icon: string; description: string; isMission?: boolean }[] = [
-  { label: 'Simple', value: 'simple', icon: '⏹️', description: 'One tap to dismiss' },
-  { label: 'Breathing Exercise', value: 'breathing', icon: '🌬️', description: 'Complete a breathing cycle', isMission: true },
-  { label: 'Type Affirmation', value: 'affirmation', icon: '✨', description: 'Type an affirmation to dismiss', isMission: true },
-  { label: 'Math Problem', value: 'math', icon: '🧮', description: 'Solve a math problem', isMission: true },
-  { label: 'Shake Phone', value: 'shake', icon: '📳', description: 'Shake your phone to wake up', isMission: true },
-];
-
 const SHAKE_THRESHOLD = 1.5;
 const REQUIRED_SHAKES = 20;
 const BREATHING_CYCLES_REQUIRED = 3;
-
-const AFFIRMATIONS = [
-  'I am ready for today',
-];
-
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const STORAGE_KEY = '@softwake_alarms';
 const SLEEP_STORAGE_KEY = '@softwake_sleep_data';
 const SETTINGS_STORAGE_KEY = '@softwake_settings';
 const BEDTIME_NOTIFICATION_ID = 'bedtime-reminder';
 const ALARM_NOTIFICATION_PREFIX = 'alarm-';
-
-const SLEEP_GOAL_OPTIONS = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
 
 const DEFAULT_SETTINGS: Settings = {
   bedtimeReminderEnabled: false,
@@ -193,225 +142,6 @@ const THEMES = {
   },
 };
 
-// Premium Wheel Time Picker with smooth scrolling like iOS/Android alarm apps
-type TimePickerProps = {
-  hour: number;
-  minute: number;
-  onHourChange: (hour: number) => void;
-  onMinuteChange: (minute: number) => void;
-  minuteStep?: number;
-  hapticFeedback?: boolean;
-};
-
-// Generate hour data (1-12)
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
-const AMPM = ['AM', 'PM'];
-
-const TimePicker = ({ hour, minute, onHourChange, onMinuteChange, minuteStep = 1, hapticFeedback = true }: TimePickerProps) => {
-  const displayHour = hour % 12 || 12;
-  const isPM = hour >= 12;
-  const lastHourRef = useRef(displayHour);
-  const lastMinuteRef = useRef(minute);
-  const lastAmPmRef = useRef(isPM ? 1 : 0);
-
-  // Generate minute options based on step
-  const minuteOptions: number[] = [];
-  for (let i = 0; i < 60; i += minuteStep) {
-    minuteOptions.push(i);
-  }
-
-  const handleHourChange = (index: number) => {
-    const newDisplayHour = HOURS[index];
-    if (newDisplayHour !== lastHourRef.current) {
-      lastHourRef.current = newDisplayHour;
-      if (hapticFeedback) Haptics.selectionAsync();
-      if (isPM) {
-        onHourChange(newDisplayHour === 12 ? 12 : newDisplayHour + 12);
-      } else {
-        onHourChange(newDisplayHour === 12 ? 0 : newDisplayHour);
-      }
-    }
-  };
-
-  const handleMinuteChange = (index: number) => {
-    const newMinute = minuteOptions[index];
-    if (newMinute !== lastMinuteRef.current) {
-      lastMinuteRef.current = newMinute;
-      if (hapticFeedback) Haptics.selectionAsync();
-      onMinuteChange(newMinute);
-    }
-  };
-
-  const handleAMPMChange = (index: number) => {
-    if (index !== lastAmPmRef.current) {
-      lastAmPmRef.current = index;
-      if (hapticFeedback) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      if (index === 0 && isPM) {
-        onHourChange(hour - 12);
-      } else if (index === 1 && !isPM) {
-        onHourChange(hour + 12);
-      }
-    }
-  };
-
-  const renderHourItem = (data: number, index: number, isSelected: boolean) => (
-    <View style={timePickerStyles.itemContainer}>
-      <Text style={[
-        timePickerStyles.itemText,
-        isSelected && timePickerStyles.selectedItemText
-      ]}>
-        {data}
-      </Text>
-    </View>
-  );
-
-  const renderMinuteItem = (data: number, index: number, isSelected: boolean) => (
-    <View style={timePickerStyles.itemContainer}>
-      <Text style={[
-        timePickerStyles.itemText,
-        isSelected && timePickerStyles.selectedItemText
-      ]}>
-        {data.toString().padStart(2, '0')}
-      </Text>
-    </View>
-  );
-
-  const renderAMPMItem = (data: string, index: number, isSelected: boolean) => (
-    <View style={timePickerStyles.itemContainer}>
-      <Text style={[
-        timePickerStyles.ampmText,
-        isSelected && timePickerStyles.selectedAmpmText
-      ]}>
-        {data}
-      </Text>
-    </View>
-  );
-
-  return (
-    <View style={timePickerStyles.container}>
-      {/* Selection highlight overlay */}
-      <View style={timePickerStyles.selectionHighlight} pointerEvents="none" />
-
-      {/* Hour picker */}
-      <View style={timePickerStyles.wheelWrapper}>
-        <WheelPicker
-          dataSource={HOURS}
-          selectedIndex={HOURS.indexOf(displayHour)}
-          onValueChange={(_data: number | undefined, index: number) => handleHourChange(index)}
-          renderItem={renderHourItem}
-          itemHeight={60}
-          wrapperHeight={180}
-          wrapperBackground="transparent"
-          highlightColor="transparent"
-          highlightBorderWidth={0}
-        />
-      </View>
-
-      <Text style={timePickerStyles.separator}>:</Text>
-
-      {/* Minute picker */}
-      <View style={timePickerStyles.wheelWrapper}>
-        <WheelPicker
-          dataSource={minuteOptions}
-          selectedIndex={minuteOptions.indexOf(minute)}
-          onValueChange={(_data: number | undefined, index: number) => handleMinuteChange(index)}
-          renderItem={renderMinuteItem}
-          itemHeight={60}
-          wrapperHeight={180}
-          wrapperBackground="transparent"
-          highlightColor="transparent"
-          highlightBorderWidth={0}
-        />
-      </View>
-
-      {/* AM/PM picker */}
-      <View style={timePickerStyles.ampmWrapper}>
-        <WheelPicker
-          dataSource={AMPM}
-          selectedIndex={isPM ? 1 : 0}
-          onValueChange={(_data: string | undefined, index: number) => handleAMPMChange(index)}
-          renderItem={renderAMPMItem}
-          itemHeight={60}
-          wrapperHeight={180}
-          wrapperBackground="transparent"
-          highlightColor="transparent"
-          highlightBorderWidth={0}
-        />
-      </View>
-    </View>
-  );
-};
-
-const timePickerStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    backgroundColor: '#1A1A1A',
-    borderRadius: 20,
-    marginHorizontal: 16,
-    marginVertical: 12,
-    height: 200,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  selectionHighlight: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    height: 60,
-    top: '50%',
-    marginTop: -30,
-    backgroundColor: 'rgba(129, 140, 248, 0.12)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(129, 140, 248, 0.25)',
-  },
-  wheelWrapper: {
-    width: 80,
-    height: 180,
-    overflow: 'hidden',
-  },
-  ampmWrapper: {
-    width: 70,
-    height: 180,
-    overflow: 'hidden',
-    marginLeft: 8,
-  },
-  itemContainer: {
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  itemText: {
-    fontSize: 36,
-    fontWeight: '200',
-    color: 'rgba(255, 255, 255, 0.35)',
-  },
-  selectedItemText: {
-    fontSize: 42,
-    fontWeight: '300',
-    color: '#FFFFFF',
-  },
-  ampmText: {
-    fontSize: 24,
-    fontWeight: '400',
-    color: 'rgba(255, 255, 255, 0.35)',
-  },
-  selectedAmpmText: {
-    fontSize: 28,
-    fontWeight: '500',
-    color: '#FFFFFF',
-  },
-  separator: {
-    fontSize: 42,
-    fontWeight: '200',
-    color: '#FFFFFF',
-    marginHorizontal: 4,
-  },
-});
-
 const generateMathProblem = (): MathProblem => {
   const operations = ['+', '-', '*'];
   const operation = operations[Math.floor(Math.random() * operations.length)];
@@ -446,9 +176,69 @@ const generateMathProblem = (): MathProblem => {
 };
 
 export default function App() {
+  // === HOOKS ===
+  // Settings hook (must be first to get theme)
+  const { settings, updateSettings, isLoading: settingsLoading } = useSettings();
+  const theme = settings.darkMode ? THEMES.dark : THEMES.light;
+
+  // Alarms hook
+  const {
+    alarms,
+    setAlarms,
+    modalVisible,
+    setModalVisible,
+    editingAlarmId,
+    setEditingAlarmId,
+    selectedHour,
+    setSelectedHour,
+    selectedMinute,
+    setSelectedMinute,
+    selectedDays,
+    setSelectedDays,
+    selectedLabel,
+    setSelectedLabel,
+    selectedSnooze,
+    setSelectedSnooze,
+    selectedWakeIntensity,
+    setSelectedWakeIntensity,
+    selectedSound,
+    setSelectedSound,
+    selectedDismissType,
+    setSelectedDismissType,
+    handleAddAlarm,
+    handleEditAlarm,
+    handleSaveAlarm,
+    toggleAlarm,
+    deleteAlarm,
+    toggleDay,
+    showUndoToast,
+    undoDelete,
+    isLoaded: alarmsLoaded,
+  } = useAlarms();
+
+  // Sleep tracking hook
+  const {
+    sleepData,
+    bedtimeModalVisible,
+    setBedtimeModalVisible,
+    bedtimeHour,
+    setBedtimeHour,
+    bedtimeMinute,
+    setBedtimeMinute,
+    pendingWakeTime,
+    setPendingWakeTime,
+    getWeeklyData,
+    getSleepStats,
+    handleSaveBedtime,
+    handleSkipBedtime,
+    isLoading: sleepLoading,
+  } = useSleepTracking();
+
+  // Alarm sound preview hook
+  const { playPreviewSound, stopPreviewSound } = useAlarmSound();
+
+  // === LOCAL STATE ===
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [modalVisible, setModalVisible] = useState(false);
-  const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [alarmScreenVisible, setAlarmScreenVisible] = useState(false);
   const [activeAlarm, setActiveAlarm] = useState<Alarm | null>(null);
   const [mathProblem, setMathProblem] = useState<MathProblem>(generateMathProblem());
@@ -483,45 +273,26 @@ export default function App() {
   const [targetAffirmation, setTargetAffirmation] = useState(AFFIRMATIONS[0]);
   const [affirmationComplete, setAffirmationComplete] = useState(false);
 
-  // New alarm state
-  const [selectedHour, setSelectedHour] = useState(8);
-  const [selectedMinute, setSelectedMinute] = useState(0);
-  const [selectedDays, setSelectedDays] = useState<boolean[]>([
-    false, false, false, false, false, false, false,
-  ]);
-  const [selectedLabel, setSelectedLabel] = useState('');
-  const [selectedSnooze, setSelectedSnooze] = useState(10);
-  const [selectedWakeIntensity, setSelectedWakeIntensity] = useState<WakeIntensity>('energetic');
-  const [selectedSound, setSelectedSound] = useState<AlarmSound>('sunrise');
-  const [selectedDismissType, setSelectedDismissType] = useState<DismissType>('simple');
-  const [editingAlarmId, setEditingAlarmId] = useState<string | null>(null);
+  // New alarm state - now from useAlarms hook
 
   // Shake detection state
   const [shakeCount, setShakeCount] = useState(0);
   const [shakeComplete, setShakeComplete] = useState(false);
   const lastShakeTime = useRef<number>(0);
 
-  // Undo delete state
-  const [deletedAlarm, setDeletedAlarm] = useState<Alarm | null>(null);
-  const [showUndoToast, setShowUndoToast] = useState(false);
-  const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Undo delete state - now from useAlarms hook
 
-  // Sleep tracking state
-  const [sleepData, setSleepData] = useState<SleepEntry[]>([]);
-  const [bedtimeModalVisible, setBedtimeModalVisible] = useState(false);
-  const [bedtimeHour, setBedtimeHour] = useState(22);
-  const [bedtimeMinute, setBedtimeMinute] = useState(0);
-  const [pendingWakeTime, setPendingWakeTime] = useState<Date | null>(null);
+  // Sleep tracking state - now from useSleepTracking hook
+  // Keep sleepInsightVisible locally (UI state, not data state)
   const [sleepInsightVisible, setSleepInsightVisible] = useState(false);
 
   // Audio
   const soundRef = useRef<Audio.Sound | null>(null);
   const lastTriggeredRef = useRef<string>('');
-  const [isLoaded, setIsLoaded] = useState(false);
+  // Combined loading state from hooks
+  const isLoaded = alarmsLoaded && !settingsLoading && !sleepLoading;
 
-  // Settings state
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const theme = settings.darkMode ? THEMES.dark : THEMES.light;
+  // Settings state - now from useSettings hook
   const [bedtimePickerVisible, setBedtimePickerVisible] = useState(false);
 
   // Stats modal state
@@ -530,73 +301,20 @@ export default function App() {
   // Tab navigation state
   const [activeTab, setActiveTab] = useState<TabName>('alarms');
 
-  // Load alarms, sleep data, and settings from storage on mount
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [storedAlarms, storedSleep, storedSettings] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEY),
-          AsyncStorage.getItem(SLEEP_STORAGE_KEY),
-          AsyncStorage.getItem(SETTINGS_STORAGE_KEY),
-        ]);
-        if (storedAlarms) {
-          setAlarms(JSON.parse(storedAlarms));
-        }
-        if (storedSleep) {
-          setSleepData(JSON.parse(storedSleep));
-        }
-        if (storedSettings) {
-          const parsedSettings = JSON.parse(storedSettings);
-          setSettings({ ...DEFAULT_SETTINGS, ...parsedSettings });
-        }
-      } catch (error) {
-        console.log('Error loading data:', error);
-      } finally {
-        setIsLoaded(true);
-      }
-    };
-    loadData();
-  }, []);
+  // Loading is now handled by hooks (useAlarms, useSettings, useSleepTracking)
 
-  // Save alarms to storage and schedule notifications whenever they change
+  // Schedule alarm notifications whenever alarms change (AsyncStorage save handled by useAlarms hook)
   useEffect(() => {
     if (!isLoaded) return;
-    const saveAlarmsAndSchedule = async () => {
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(alarms));
-        await scheduleAlarmNotifications(alarms);
-      } catch (error) {
-        console.log('Error saving alarms:', error);
-      }
-    };
-    saveAlarmsAndSchedule();
+    scheduleAlarmNotifications(alarms);
   }, [alarms, isLoaded]);
 
-  // Save sleep data to storage whenever it changes
-  useEffect(() => {
-    if (!isLoaded) return;
-    const saveSleepData = async () => {
-      try {
-        await AsyncStorage.setItem(SLEEP_STORAGE_KEY, JSON.stringify(sleepData));
-      } catch (error) {
-        console.log('Error saving sleep data:', error);
-      }
-    };
-    saveSleepData();
-  }, [sleepData, isLoaded]);
+  // Sleep data save is now handled by useSleepTracking hook
 
-  // Save settings and schedule bedtime notification
+  // Schedule bedtime notification when settings change (AsyncStorage save handled by useSettings hook)
   useEffect(() => {
     if (!isLoaded) return;
-    const saveSettingsAndSchedule = async () => {
-      try {
-        await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-        await scheduleBedtimeNotification();
-      } catch (error) {
-        console.log('Error saving settings:', error);
-      }
-    };
-    saveSettingsAndSchedule();
+    scheduleBedtimeNotification();
   }, [settings, isLoaded]);
 
   // Request notification permissions on mount (only in development builds, not Expo Go)
@@ -667,12 +385,6 @@ export default function App() {
     for (const alarm of alarmsToSchedule) {
       if (!alarm.enabled) continue;
 
-      const formatTime = (h: number, m: number) => {
-        const displayHour = h % 12 || 12;
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        return `${displayHour}:${m.toString().padStart(2, '0')} ${ampm}`;
-      };
-
       const hasRepeatingDays = alarm.days.some((d) => d);
 
       if (hasRepeatingDays) {
@@ -687,7 +399,7 @@ export default function App() {
             identifier: `${ALARM_NOTIFICATION_PREFIX}${alarm.id}-${dayIndex}`,
             content: {
               title: alarm.label || 'SoftWake Alarm',
-              body: `Alarm for ${formatTime(alarm.hour, alarm.minute)}`,
+              body: `Alarm for ${formatTimeWithPeriod(alarm.hour, alarm.minute)}`,
               sound: true,
               data: { alarmId: alarm.id },
               ...(Platform.OS === 'android' && { channelId: 'alarms' }),
@@ -715,7 +427,7 @@ export default function App() {
           identifier: `${ALARM_NOTIFICATION_PREFIX}${alarm.id}-once`,
           content: {
             title: alarm.label || 'SoftWake Alarm',
-            body: `Alarm for ${formatTime(alarm.hour, alarm.minute)}`,
+            body: `Alarm for ${formatTimeWithPeriod(alarm.hour, alarm.minute)}`,
             sound: true,
             data: { alarmId: alarm.id },
             ...(Platform.OS === 'android' && { channelId: 'alarms' }),
@@ -905,6 +617,20 @@ export default function App() {
     setActiveAlarm(null);
   };
 
+  // Cleanup breathing timer when alarm screen is hidden or component unmounts
+  useEffect(() => {
+    if (!alarmScreenVisible && breathingTimerRef.current) {
+      clearTimeout(breathingTimerRef.current);
+      breathingTimerRef.current = null;
+    }
+    return () => {
+      if (breathingTimerRef.current) {
+        clearTimeout(breathingTimerRef.current);
+        breathingTimerRef.current = null;
+      }
+    };
+  }, [alarmScreenVisible]);
+
   const handleAffirmationChange = async (text: string) => {
     setAffirmationText(text);
     if (text.toLowerCase().trim() === targetAffirmation.toLowerCase()) {
@@ -1060,48 +786,19 @@ export default function App() {
     }
   };
 
-  const previewSoundRef = useRef<Audio.Sound | null>(null);
-
-  const playPreviewSound = async () => {
-    // Stop any existing preview
-    if (previewSoundRef.current) {
-      await previewSoundRef.current.stopAsync();
-      await previewSoundRef.current.unloadAsync();
-      previewSoundRef.current = null;
-    }
-
-    try {
-      const intensityOption = WAKE_INTENSITY_OPTIONS.find(o => o.value === selectedWakeIntensity);
-      const volume = intensityOption ? intensityOption.volume : 0.5;
-      const config = SOUND_CONFIGS[selectedSound];
-
-      const { sound } = await Audio.Sound.createAsync(
-        require('./assets/alarm-sound.mp3'),
-        {
-          volume,
-          rate: config.rate,
-          shouldCorrectPitch: false,
-        }
-      );
-
-      previewSoundRef.current = sound;
-      await sound.playAsync();
-
-      // Stop after 2 seconds
-      setTimeout(async () => {
-        if (previewSoundRef.current) {
-          await previewSoundRef.current.stopAsync();
-          await previewSoundRef.current.unloadAsync();
-          previewSoundRef.current = null;
-        }
-      }, 2000);
-    } catch (error) {
-      console.log('Error playing preview:', error);
-    }
-  };
+  // Sound preview is now handled by useAlarmSound hook
 
   const handleDismissAlarm = async () => {
-    const answer = parseInt(userAnswer, 10);
+    // Validate numeric input
+    const trimmed = userAnswer.trim();
+    if (trimmed === '' || !/^-?\d+$/.test(trimmed)) {
+      // Invalid input - not a number
+      setWrongAnswer(true);
+      setUserAnswer('');
+      setTimeout(() => setWrongAnswer(false), 500);
+      return;
+    }
+    const answer = parseInt(trimmed, 10);
     if (answer === mathProblem.answer) {
       await stopAlarmSound();
       setMathComplete(true);
@@ -1150,24 +847,7 @@ export default function App() {
     setActiveAlarm(null);
   };
 
-  const formatTime = (date: Date) => {
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const displayHours = hours % 12 || 12;
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    return {
-      time: `${displayHours}:${minutes.toString().padStart(2, '0')}`,
-      ampm,
-    };
-  };
-
-  const formatAlarmTime = (hour: number, minute: number) => {
-    const displayHour = hour % 12 || 12;
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    return `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
-  };
-
-  const { time, ampm } = formatTime(currentTime);
+  const { time, ampm } = formatTimeObject(currentTime);
 
   const getNextAlarmCountdown = (): { hours: number; minutes: number } | null => {
     const enabledAlarms = alarms.filter(a => a.enabled);
@@ -1224,141 +904,30 @@ export default function App() {
     }
   };
 
-  const handleAddAlarm = () => {
-    setEditingAlarmId(null);
-    setSelectedHour(8);
-    setSelectedMinute(0);
-    setSelectedDays([false, false, false, false, false, false, false]);
-    setSelectedLabel('');
-    setSelectedSnooze(10);
-    setSelectedWakeIntensity(settings.defaultWakeIntensity);
-    setSelectedSound(settings.defaultSound);
-    setSelectedDismissType(settings.defaultDismissType);
-    setModalVisible(true);
+  // Wrapper functions that pass app-specific context to hook functions
+  const handleAddAlarmWithDefaults = () => {
+    handleAddAlarm({
+      defaultWakeIntensity: settings.defaultWakeIntensity,
+      defaultSound: settings.defaultSound,
+      defaultDismissType: settings.defaultDismissType,
+    });
   };
 
-  const handleEditAlarm = (alarm: Alarm) => {
-    setEditingAlarmId(alarm.id);
-    setSelectedHour(alarm.hour);
-    setSelectedMinute(alarm.minute);
-    setSelectedDays([...alarm.days]);
-    setSelectedLabel(alarm.label);
-    setSelectedSnooze(alarm.snooze);
-    setSelectedWakeIntensity(alarm.wakeIntensity || 'energetic');
-    setSelectedSound(alarm.sound || 'sunrise');
-    const dismissType = (alarm.dismissType as string) === 'off' ? 'simple' : (alarm.dismissType || 'simple');
-    setSelectedDismissType(dismissType);
-    setModalVisible(true);
+  const handleSaveAlarmWithCleanup = () => {
+    handleSaveAlarm(() => stopPreviewSound());
   };
 
-  const toggleDay = (index: number) => {
-    const newDays = [...selectedDays];
-    newDays[index] = !newDays[index];
-    setSelectedDays(newDays);
+  const deleteAlarmWithHaptics = (id: string) => {
+    deleteAlarm(id, settings.hapticFeedback);
   };
 
-  const handleSaveAlarm = () => {
-    if (previewSoundRef.current) { previewSoundRef.current.stopAsync(); previewSoundRef.current.unloadAsync(); previewSoundRef.current = null; }
-    if (editingAlarmId) {
-      // Update existing alarm
-      setAlarms(alarms.map((alarm) =>
-        alarm.id === editingAlarmId
-          ? {
-              ...alarm,
-              hour: selectedHour,
-              minute: selectedMinute,
-              days: selectedDays,
-              label: selectedLabel,
-              snooze: selectedSnooze,
-              wakeIntensity: selectedWakeIntensity,
-              sound: selectedSound,
-              dismissType: selectedDismissType,
-            }
-          : alarm
-      ));
-    } else {
-      // Create new alarm
-      const newAlarm: Alarm = {
-        id: Date.now().toString(),
-        hour: selectedHour,
-        minute: selectedMinute,
-        days: selectedDays,
-        enabled: true,
-        label: selectedLabel,
-        snooze: selectedSnooze,
-        wakeIntensity: selectedWakeIntensity,
-        sound: selectedSound,
-        dismissType: selectedDismissType,
-      };
-      setAlarms([...alarms, newAlarm]);
-    }
-    setModalVisible(false);
-    setEditingAlarmId(null);
+  const playPreviewSoundWithCurrentSettings = () => {
+    playPreviewSound(selectedSound, selectedWakeIntensity);
   };
 
-  const getRepeatText = (days: boolean[]) => {
-    if (days.every((d) => !d)) return 'Once';
-    if (days.every((d) => d)) return 'Every day';
-    if (days.slice(1, 6).every((d) => d) && !days[0] && !days[6]) return 'Weekdays';
-    if (days[0] && days[6] && days.slice(1, 6).every((d) => !d)) return 'Weekends';
-    return days
-      .map((selected, i) => (selected ? DAYS[i] : null))
-      .filter(Boolean)
-      .join(', ');
-  };
+  // handleEditAlarm, toggleAlarm, toggleDay, undoDelete are used directly from useAlarms hook
 
-  const toggleAlarm = (id: string) => {
-    setAlarms(alarms.map((alarm) =>
-      alarm.id === id ? { ...alarm, enabled: !alarm.enabled } : alarm
-    ));
-  };
-
-  const deleteAlarm = (id: string) => {
-    const alarmToDelete = alarms.find((alarm) => alarm.id === id);
-    if (!alarmToDelete) return;
-
-    // Clear any existing undo timer
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-    }
-
-    // Store deleted alarm for undo
-    setDeletedAlarm(alarmToDelete);
-    setShowUndoToast(true);
-    setAlarms(alarms.filter((alarm) => alarm.id !== id));
-
-    // Haptic feedback
-    if (settings.hapticFeedback) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-
-    // Auto-hide toast after 3 seconds
-    undoTimerRef.current = setTimeout(() => {
-      setShowUndoToast(false);
-      setDeletedAlarm(null);
-    }, 3000);
-  };
-
-  const undoDelete = () => {
-    if (deletedAlarm) {
-      setAlarms((prev) => [...prev, deletedAlarm]);
-      setDeletedAlarm(null);
-      setShowUndoToast(false);
-      if (undoTimerRef.current) {
-        clearTimeout(undoTimerRef.current);
-      }
-    }
-  };
-
-  const updateSettings = (partial: Partial<Settings>) => {
-    setSettings((prev) => ({ ...prev, ...partial }));
-  };
-
-  const formatSettingsTime = (hour: number, minute: number) => {
-    const displayHour = hour % 12 || 12;
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    return `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
-  };
+  // updateSettings is now from useSettings hook
 
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -1366,128 +935,24 @@ export default function App() {
     return `${hours}h ${mins}m`;
   };
 
-  const getWeeklyData = () => {
-    const now = new Date();
-    const weekData: { day: string; duration: number; date: Date }[] = [];
+  // getWeeklyData, getSleepStats, handleSkipBedtime are now from useSleepTracking hook
 
-    // Get last 7 days
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(now);
-      date.setDate(date.getDate() - i);
-      date.setHours(0, 0, 0, 0);
+  // Track previous sleep data length to detect when we reach 7 entries
+  const prevSleepLengthRef = useRef(sleepData.length);
 
-      const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
-
-      // Find sleep entry for this day (based on wake time)
-      const entry = sleepData.find((e) => {
-        const wakeDate = new Date(e.wakeTime);
-        return wakeDate >= date && wakeDate < nextDate;
-      });
-
-      weekData.push({
-        day: DAYS[date.getDay()],
-        duration: entry ? entry.sleepDuration : 0,
-        date,
-      });
-    }
-
-    return weekData;
+  // Wrapper to show sleep insight after saving bedtime
+  const handleSaveBedtimeWithInsight = () => {
+    prevSleepLengthRef.current = sleepData.length;
+    handleSaveBedtime();
   };
 
-  const getSleepStats = () => {
-    if (sleepData.length === 0) {
-      return null;
-    }
-
-    const durations = sleepData.map((e) => e.sleepDuration);
-    const total = durations.reduce((sum, d) => sum + d, 0);
-    const average = Math.round(total / durations.length);
-
-    const best = sleepData.reduce((max, e) =>
-      e.sleepDuration > max.sleepDuration ? e : max
-    );
-    const worst = sleepData.reduce((min, e) =>
-      e.sleepDuration < min.sleepDuration ? e : min
-    );
-
-    // Calculate average bedtime
-    const bedtimeMinutes = sleepData.map((e) => {
-      const bed = new Date(e.bedtime);
-      let mins = bed.getHours() * 60 + bed.getMinutes();
-      if (mins < 720) mins += 1440; // After midnight, add 24h
-      return mins;
-    });
-    const avgBedtimeMinutes = Math.round(
-      bedtimeMinutes.reduce((sum, m) => sum + m, 0) / bedtimeMinutes.length
-    ) % 1440;
-    const avgBedtimeHour = Math.floor(avgBedtimeMinutes / 60);
-    const avgBedtimeMinute = avgBedtimeMinutes % 60;
-
-    // Calculate average wake time
-    const wakeMinutes = sleepData.map((e) => {
-      const wake = new Date(e.wakeTime);
-      return wake.getHours() * 60 + wake.getMinutes();
-    });
-    const avgWakeMinutes = Math.round(
-      wakeMinutes.reduce((sum, m) => sum + m, 0) / wakeMinutes.length
-    );
-    const avgWakeHour = Math.floor(avgWakeMinutes / 60);
-    const avgWakeMinute = avgWakeMinutes % 60;
-
-    return {
-      average,
-      best: {
-        duration: best.sleepDuration,
-        date: new Date(best.wakeTime),
-      },
-      worst: {
-        duration: worst.sleepDuration,
-        date: new Date(worst.wakeTime),
-      },
-      totalNights: sleepData.length,
-      avgBedtime: formatSettingsTime(avgBedtimeHour, avgBedtimeMinute),
-      avgWakeTime: formatSettingsTime(avgWakeHour, avgWakeMinute),
-    };
-  };
-
-  const handleSaveBedtime = () => {
-    if (!pendingWakeTime) return;
-
-    // Calculate bedtime timestamp (previous day if bedtime hour > wake hour)
-    const wakeTime = pendingWakeTime;
-    const bedtime = new Date(wakeTime);
-    bedtime.setHours(bedtimeHour, bedtimeMinute, 0, 0);
-
-    // If bedtime is after wake time, it was the previous day
-    if (bedtime >= wakeTime) {
-      bedtime.setDate(bedtime.getDate() - 1);
-    }
-
-    const sleepDuration = Math.round((wakeTime.getTime() - bedtime.getTime()) / (1000 * 60));
-
-    const newEntry: SleepEntry = {
-      id: Date.now().toString(),
-      bedtime: bedtime.getTime(),
-      wakeTime: wakeTime.getTime(),
-      sleepDuration,
-    };
-
-    const updatedSleepData = [...sleepData, newEntry];
-    setSleepData(updatedSleepData);
-    setBedtimeModalVisible(false);
-    setPendingWakeTime(null);
-
-    // Show insight if we have 7+ entries
-    if (updatedSleepData.length >= 7) {
+  // Show sleep insight when we first reach 7 entries after a save
+  useEffect(() => {
+    if (sleepData.length >= 7 && prevSleepLengthRef.current < 7) {
       setSleepInsightVisible(true);
     }
-  };
-
-  const handleSkipBedtime = () => {
-    setBedtimeModalVisible(false);
-    setPendingWakeTime(null);
-  };
+    prevSleepLengthRef.current = sleepData.length;
+  }, [sleepData.length]);
 
   const getOptimalWakeTime = (): { hour: number; minute: number; avgSleep: number } | null => {
     if (sleepData.length < 7) return null;
@@ -1526,20 +991,9 @@ export default function App() {
     };
   };
 
-  const SWIPE_THRESHOLD = 80;
-
-  const createSwipeHandler = (alarmId: string) => {
-    return (event: PanGestureHandlerGestureEvent) => {
-      const { translationX, translationY } = event.nativeEvent;
-      // Swipe left (negative X) or swipe down (positive Y) to delete
-      if (translationX < -SWIPE_THRESHOLD || translationY > SWIPE_THRESHOLD) {
-        deleteAlarm(alarmId);
-      }
-    };
-  };
-
   return (
     <GestureHandlerRootView style={styles.container}>
+      <ErrorBoundary>
       <LinearGradient colors={[...theme.gradient]} style={styles.container}>
       <StatusBar style={settings.darkMode ? 'light' : 'dark'} />
 
@@ -1575,53 +1029,17 @@ export default function App() {
 
           <View style={styles.alarmsContainer}>
             <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Alarms</Text>
-            {alarms.length === 0 ? (
-              <Text style={[styles.noAlarmsText, { color: theme.textMuted }]}>No alarms set</Text>
-            ) : (
-              <ScrollView style={styles.alarmsList} showsVerticalScrollIndicator={false}>
-                {alarms.map((alarm) => (
-                  <PanGestureHandler
-                    key={alarm.id}
-                    onEnded={createSwipeHandler(alarm.id)}
-                    activeOffsetX={[-20, 20]}
-                    activeOffsetY={[-20, 20]}
-                  >
-                    <View style={[styles.alarmItem, { backgroundColor: theme.card }]}>
-                      <TouchableOpacity
-                        style={styles.alarmInfo}
-                        onPress={() => handleEditAlarm(alarm)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[
-                          styles.alarmTime,
-                          { color: theme.text },
-                          !alarm.enabled && { color: theme.textDisabled },
-                        ]}>
-                          {formatAlarmTime(alarm.hour, alarm.minute)}
-                        </Text>
-                        <Text style={[
-                          styles.alarmDays,
-                          { color: theme.textMuted },
-                          !alarm.enabled && { color: theme.textDisabled },
-                        ]}>
-                          {alarm.label ? `${alarm.label} · ` : ''}{getRepeatText(alarm.days)}
-                          {alarm.wakeIntensity && alarm.wakeIntensity !== 'energetic' ? ` · ${alarm.wakeIntensity.charAt(0).toUpperCase() + alarm.wakeIntensity.slice(1)}` : ''}
-                        </Text>
-                      </TouchableOpacity>
-                      <Switch
-                        value={alarm.enabled}
-                        onValueChange={() => toggleAlarm(alarm.id)}
-                        trackColor={{ false: theme.switchTrackOff, true: theme.accent }}
-                        thumbColor={alarm.enabled ? '#FFFFFF' : theme.switchThumbOff}
-                      />
-                    </View>
-                  </PanGestureHandler>
-                ))}
-              </ScrollView>
-            )}
+            <AlarmsList
+              alarms={alarms}
+              theme={theme}
+              onToggleAlarm={toggleAlarm}
+              onEditAlarm={handleEditAlarm}
+              onDeleteAlarm={deleteAlarmWithHaptics}
+              formatAlarmTime={formatTimeWithPeriod}
+            />
           </View>
 
-          <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.accent }]} onPress={handleAddAlarm}>
+          <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.accent }]} onPress={handleAddAlarmWithDefaults}>
             <Text style={styles.addButtonText}>+</Text>
           </TouchableOpacity>
         </View>
@@ -1668,242 +1086,24 @@ export default function App() {
       )}
 
       {activeTab === 'insights' && (
-        <ScrollView style={styles.insightsContainer} showsVerticalScrollIndicator={false}>
-          <Text style={[styles.insightsTitle, { color: theme.text }]}>Sleep Insights</Text>
-
-          {/* Weekly Sleep Chart */}
-          <View style={[styles.insightsCard, { backgroundColor: theme.card }]}>
-            <Text style={[styles.insightsCardLabel, { color: theme.textMuted }]}>This Week</Text>
-            <View style={styles.insightsChart}>
-              {[
-                { day: 'M', hrs: 7.5 },
-                { day: 'T', hrs: 6.2 },
-                { day: 'W', hrs: 7.8 },
-                { day: 'T', hrs: 5.5 },
-                { day: 'F', hrs: 7.0 },
-                { day: 'S', hrs: 8.2 },
-                { day: 'S', hrs: 7.0 },
-              ].map((d, i) => (
-                <View key={i} style={styles.insightsBarCol}>
-                  <View style={[styles.insightsBarTrack, { backgroundColor: theme.surface }]}>
-                    <View style={[styles.insightsBar, { height: `${(d.hrs / 10) * 100}%`, backgroundColor: theme.accent }]} />
-                  </View>
-                  <Text style={[styles.insightsBarLabel, { color: theme.textMuted }]}>{d.day}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Stats Row */}
-          <View style={styles.insightsStatsRow}>
-            <View style={[styles.insightsStatBox, { backgroundColor: theme.card }]}>
-              <Text style={[styles.insightsStatValue, { color: theme.text }]}>7.2 hrs</Text>
-              <Text style={[styles.insightsStatLabel, { color: theme.textMuted }]}>Avg Sleep</Text>
-            </View>
-            <View style={[styles.insightsStatBox, { backgroundColor: theme.card }]}>
-              <Text style={[styles.insightsStatValue, { color: theme.text }]}>8 hrs</Text>
-              <Text style={[styles.insightsStatLabel, { color: theme.textMuted }]}>Sleep Goal</Text>
-            </View>
-          </View>
-
-          {/* Sleep Debt Card */}
-          <View style={[styles.insightsCard, { backgroundColor: theme.card }]}>
-            <Text style={[styles.insightsCardLabel, { color: theme.textMuted }]}>Sleep Debt</Text>
-            <Text style={[styles.insightsCardValue, { color: theme.text }]}>You're 5.6 hrs behind this week</Text>
-          </View>
-
-          {/* Tip Card */}
-          <View style={[styles.insightsCard, styles.insightsTipCard, { backgroundColor: theme.accentAlt }]}>
-            <Text style={styles.insightsTipLabel}>Tip</Text>
-            <Text style={styles.insightsTipText}>Try going to bed 15 minutes earlier tonight</Text>
-          </View>
-        </ScrollView>
+        <InsightsChart
+          sleepData={sleepData}
+          settings={settings}
+          theme={theme}
+          getWeeklyData={getWeeklyData}
+          getSleepStats={getSleepStats}
+        />
       )}
 
       {activeTab === 'settings' && (
-        <ScrollView style={styles.settingsTabContent} showsVerticalScrollIndicator={false}>
-          {/* Alarm Defaults */}
-          <Text style={[styles.settingsSectionHeader, { color: theme.textMuted }]}>Alarm Defaults</Text>
-          <View style={[styles.settingsCard, { backgroundColor: theme.card }]}>
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => {
-                const currentIndex = WAKE_INTENSITY_OPTIONS.findIndex((o) => o.value === settings.defaultWakeIntensity);
-                const nextIndex = (currentIndex + 1) % WAKE_INTENSITY_OPTIONS.length;
-                updateSettings({ defaultWakeIntensity: WAKE_INTENSITY_OPTIONS[nextIndex].value });
-              }}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Wake Intensity</Text>
-              <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>
-                {WAKE_INTENSITY_OPTIONS.find((o) => o.value === settings.defaultWakeIntensity)?.label}
-              </Text>
-            </TouchableOpacity>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => {
-                const currentIndex = SOUND_OPTIONS.findIndex((o) => o.value === settings.defaultSound);
-                const nextIndex = (currentIndex + 1) % SOUND_OPTIONS.length;
-                updateSettings({ defaultSound: SOUND_OPTIONS[nextIndex].value });
-              }}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Sound</Text>
-              <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>
-                {SOUND_OPTIONS.find((o) => o.value === settings.defaultSound)?.label}
-              </Text>
-            </TouchableOpacity>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => {
-                const currentIndex = DISMISS_OPTIONS.findIndex((o) => o.value === settings.defaultDismissType);
-                const nextIndex = (currentIndex + 1) % DISMISS_OPTIONS.length;
-                updateSettings({ defaultDismissType: DISMISS_OPTIONS[nextIndex].value });
-              }}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Dismiss Method</Text>
-              <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>
-                {DISMISS_OPTIONS.find((o) => o.value === settings.defaultDismissType)?.label}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Sleep */}
-          <Text style={[styles.settingsSectionHeader, { color: theme.textMuted }]}>Sleep</Text>
-          <View style={[styles.settingsCard, { backgroundColor: theme.card }]}>
-            <View style={styles.settingsItemRow}>
-              <View style={styles.settingsItemLabelContainer}>
-                <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Bedtime Reminder</Text>
-                {settings.bedtimeReminderEnabled && (
-                  <Text style={[styles.settingsItemSubtext, { color: theme.textMuted }]}>
-                    Reminder at {formatSettingsTime(
-                      settings.bedtimeMinute < 30
-                        ? (settings.bedtimeHour === 0 ? 23 : settings.bedtimeHour - 1)
-                        : settings.bedtimeHour,
-                      settings.bedtimeMinute < 30
-                        ? settings.bedtimeMinute + 30
-                        : settings.bedtimeMinute - 30
-                    )}
-                  </Text>
-                )}
-              </View>
-              <Switch
-                value={settings.bedtimeReminderEnabled}
-                onValueChange={(val) => {
-                  updateSettings({ bedtimeReminderEnabled: val });
-                  if (val) setBedtimePickerVisible(true);
-                }}
-                trackColor={{ false: theme.switchTrackOff, true: theme.accent }}
-                thumbColor={settings.bedtimeReminderEnabled ? '#FFFFFF' : theme.switchThumbOff}
-              />
-            </View>
-            {settings.bedtimeReminderEnabled && bedtimePickerVisible && (
-              <>
-                <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-                <View style={styles.settingsBedtimePicker}>
-                  <Text style={[styles.settingsPickerLabel, { color: theme.text }]}>Target Bedtime</Text>
-                  <TimePicker
-                    hour={settings.bedtimeHour}
-                    minute={settings.bedtimeMinute}
-                    onHourChange={(h) => updateSettings({ bedtimeHour: h })}
-                    onMinuteChange={(m) => updateSettings({ bedtimeMinute: m })}
-                    hapticFeedback={settings.hapticFeedback}
-                    minuteStep={5}
-                  />
-                </View>
-              </>
-            )}
-            {settings.bedtimeReminderEnabled && !bedtimePickerVisible && (
-              <>
-                <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-                <TouchableOpacity
-                  style={styles.settingsItem}
-                  onPress={() => setBedtimePickerVisible(true)}
-                >
-                  <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Target Bedtime</Text>
-                  <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>
-                    {formatSettingsTime(settings.bedtimeHour, settings.bedtimeMinute)}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => {
-                const currentIndex = SLEEP_GOAL_OPTIONS.indexOf(settings.sleepGoalHours);
-                const nextIndex = (currentIndex + 1) % SLEEP_GOAL_OPTIONS.length;
-                updateSettings({ sleepGoalHours: SLEEP_GOAL_OPTIONS[nextIndex] });
-              }}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Sleep Goal</Text>
-              <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>
-                {settings.sleepGoalHours % 1 === 0
-                  ? `${settings.sleepGoalHours} hours`
-                  : `${Math.floor(settings.sleepGoalHours)}h ${(settings.sleepGoalHours % 1) * 60}m`}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* App */}
-          <Text style={[styles.settingsSectionHeader, { color: theme.textMuted }]}>App</Text>
-          <View style={[styles.settingsCard, { backgroundColor: theme.card }]}>
-            <View style={styles.settingsItemRow}>
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Dark Mode</Text>
-              <Switch
-                value={settings.darkMode}
-                onValueChange={(val) => updateSettings({ darkMode: val })}
-                trackColor={{ false: theme.switchTrackOff, true: theme.accent }}
-                thumbColor={settings.darkMode ? '#FFFFFF' : theme.switchThumbOff}
-              />
-            </View>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <View style={styles.settingsItemRow}>
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Haptic Feedback</Text>
-              <Switch
-                value={settings.hapticFeedback}
-                onValueChange={(val) => updateSettings({ hapticFeedback: val })}
-                trackColor={{ false: theme.switchTrackOff, true: theme.accent }}
-                thumbColor={settings.hapticFeedback ? '#FFFFFF' : theme.switchThumbOff}
-              />
-            </View>
-          </View>
-
-          {/* About */}
-          <Text style={[styles.settingsSectionHeader, { color: theme.textMuted }]}>About</Text>
-          <View style={[styles.settingsCard, { backgroundColor: theme.card }]}>
-            <View style={styles.settingsItem}>
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Version</Text>
-              <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>1.0.0</Text>
-            </View>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => Alert.alert('Rate SoftWake', 'This will open the app store. (Coming soon)')}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Rate SoftWake</Text>
-              <Text style={[styles.settingsItemChevron, { color: theme.textMuted }]}>›</Text>
-            </TouchableOpacity>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => Alert.alert('Send Feedback', 'Feedback form coming soon.')}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Send Feedback</Text>
-              <Text style={[styles.settingsItemChevron, { color: theme.textMuted }]}>›</Text>
-            </TouchableOpacity>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => Alert.alert('Privacy Policy', 'Privacy policy page coming soon.')}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Privacy Policy</Text>
-              <Text style={[styles.settingsItemChevron, { color: theme.textMuted }]}>›</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.settingsFooter} />
-        </ScrollView>
+        <SettingsPanel
+          settings={settings}
+          theme={theme}
+          updateSettings={updateSettings}
+          bedtimePickerVisible={bedtimePickerVisible}
+          setBedtimePickerVisible={setBedtimePickerVisible}
+          TimePicker={TimePicker}
+        />
       )}
 
       {/* Undo Toast */}
@@ -1971,237 +1171,35 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* Add Alarm Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
+      <AlarmEditor
         visible={modalVisible}
-        onRequestClose={() => {
-          if (previewSoundRef.current) { previewSoundRef.current.stopAsync(); previewSoundRef.current.unloadAsync(); previewSoundRef.current = null; }
+        editingAlarmId={editingAlarmId}
+        theme={theme}
+        settings={settings}
+        selectedHour={selectedHour}
+        selectedMinute={selectedMinute}
+        onHourChange={setSelectedHour}
+        onMinuteChange={setSelectedMinute}
+        selectedDays={selectedDays}
+        onToggleDay={toggleDay}
+        selectedLabel={selectedLabel}
+        onLabelChange={setSelectedLabel}
+        selectedSnooze={selectedSnooze}
+        onSnoozeChange={setSelectedSnooze}
+        selectedWakeIntensity={selectedWakeIntensity}
+        onWakeIntensityChange={setSelectedWakeIntensity}
+        selectedSound={selectedSound}
+        onSoundChange={setSelectedSound}
+        selectedDismissType={selectedDismissType}
+        onDismissTypeChange={setSelectedDismissType}
+        onSave={handleSaveAlarmWithCleanup}
+        onCancel={() => {
+          stopPreviewSound();
           setModalVisible(false);
           setEditingAlarmId(null);
         }}
-      >
-        <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalScroll}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <TouchableOpacity onPress={() => {
-                  if (previewSoundRef.current) { previewSoundRef.current.stopAsync(); previewSoundRef.current.unloadAsync(); previewSoundRef.current = null; }
-                  setModalVisible(false);
-                  setEditingAlarmId(null);
-                }}>
-                  <Text style={styles.cancelButton}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={styles.modalTitle}>
-                  {editingAlarmId ? 'Edit Alarm' : 'New Alarm'}
-                </Text>
-                <TouchableOpacity onPress={handleSaveAlarm}>
-                  <Text style={styles.saveButton}>Save</Text>
-                </TouchableOpacity>
-              </View>
-
-              <TimePicker
-                hour={selectedHour}
-                minute={selectedMinute}
-                onHourChange={setSelectedHour}
-                onMinuteChange={setSelectedMinute}
-                hapticFeedback={settings.hapticFeedback}
-              />
-
-              <View style={styles.repeatSection}>
-                <Text style={styles.repeatLabel}>Repeat</Text>
-                <View style={styles.daysContainer}>
-                  {DAYS.map((day, index) => (
-                    <TouchableOpacity
-                      key={day}
-                      onPress={() => toggleDay(index)}
-                      style={[
-                        styles.dayButton,
-                        selectedDays[index] && styles.dayButtonSelected,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.dayText,
-                          selectedDays[index] && styles.dayTextSelected,
-                        ]}
-                      >
-                        {day[0]}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.labelSection}>
-                <Text style={styles.labelTitle}>Label</Text>
-                <TextInput
-                  style={styles.labelInput}
-                  value={selectedLabel}
-                  onChangeText={setSelectedLabel}
-                  placeholder="Alarm"
-                  placeholderTextColor="#444444"
-                />
-              </View>
-
-              <View style={styles.snoozeSection}>
-                <Text style={styles.snoozeTitle}>Snooze</Text>
-                <View style={styles.snoozeOptions}>
-                  {SNOOZE_OPTIONS.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      onPress={() => setSelectedSnooze(option.value)}
-                      style={[
-                        styles.snoozeOption,
-                        selectedSnooze === option.value && styles.snoozeOptionSelected,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.snoozeOptionText,
-                          selectedSnooze === option.value && styles.snoozeOptionTextSelected,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.wakeIntensitySection}>
-                <View style={styles.wakeIntensityHeader}>
-                  <Text style={styles.wakeIntensityTitle}>Wake Intensity</Text>
-                  <TouchableOpacity
-                    onPress={playPreviewSound}
-                    style={styles.previewButton}
-                  >
-                    <Text style={styles.previewButtonIcon}>🔊</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.wakeIntensityOptions}>
-                  {WAKE_INTENSITY_OPTIONS.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      onPress={() => setSelectedWakeIntensity(option.value)}
-                      style={[
-                        styles.wakeIntensityOption,
-                        selectedWakeIntensity === option.value && styles.wakeIntensityOptionSelected,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.wakeIntensityOptionText,
-                          selectedWakeIntensity === option.value && styles.wakeIntensityOptionTextSelected,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.soundSection}>
-                <Text style={styles.soundTitle}>Sound</Text>
-                <View style={styles.soundOptions}>
-                  {SOUND_OPTIONS.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      onPress={() => setSelectedSound(option.value)}
-                      style={[
-                        styles.soundOption,
-                        selectedSound === option.value && styles.soundOptionSelected,
-                      ]}
-                    >
-                      <Text style={styles.soundOptionIcon}>{option.icon}</Text>
-                      <Text
-                        style={[
-                          styles.soundOptionText,
-                          selectedSound === option.value && styles.soundOptionTextSelected,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.dismissTypeSection}>
-                <Text style={styles.dismissTypeTitle}>Dismiss Method</Text>
-                <View style={styles.dismissTypeOptions}>
-                  {DISMISS_OPTIONS.filter(o => !o.isMission).map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      onPress={() => setSelectedDismissType(option.value)}
-                      style={[
-                        styles.dismissTypeOption,
-                        selectedDismissType === option.value && styles.dismissTypeOptionSelected,
-                      ]}
-                    >
-                      <Text style={styles.dismissTypeIcon}>{option.icon}</Text>
-                      <View style={styles.dismissTypeTextContainer}>
-                        <Text
-                          style={[
-                            styles.dismissTypeLabel,
-                            selectedDismissType === option.value && styles.dismissTypeLabelSelected,
-                          ]}
-                        >
-                          {option.label}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.dismissTypeDescription,
-                            selectedDismissType === option.value && styles.dismissTypeDescriptionSelected,
-                          ]}
-                        >
-                          {option.description}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={styles.missionsSubtitle}>Wake-up Missions</Text>
-                <Text style={styles.missionsHint}>Optional challenges to help you wake up</Text>
-                <View style={styles.dismissTypeOptions}>
-                  {DISMISS_OPTIONS.filter(o => o.isMission).map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      onPress={() => setSelectedDismissType(option.value)}
-                      style={[
-                        styles.dismissTypeOption,
-                        selectedDismissType === option.value && styles.dismissTypeOptionSelected,
-                      ]}
-                    >
-                      <Text style={styles.dismissTypeIcon}>{option.icon}</Text>
-                      <View style={styles.dismissTypeTextContainer}>
-                        <Text
-                          style={[
-                            styles.dismissTypeLabel,
-                            selectedDismissType === option.value && styles.dismissTypeLabelSelected,
-                          ]}
-                        >
-                          {option.label}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.dismissTypeDescription,
-                            selectedDismissType === option.value && styles.dismissTypeDescriptionSelected,
-                          ]}
-                        >
-                          {option.description}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
+        onPlayPreview={playPreviewSoundWithCurrentSettings}
+      />
 
       {/* Alarm Dismiss Screen */}
       <Modal
@@ -2225,7 +1223,7 @@ export default function App() {
             ) : (
               <View style={styles.breathingContent}>
                 <Text style={styles.breathingTimeText}>
-                  {activeAlarm ? formatAlarmTime(activeAlarm.hour, activeAlarm.minute) : ''}
+                  {activeAlarm ? formatTimeWithPeriod(activeAlarm.hour, activeAlarm.minute) : ''}
                 </Text>
                 <View style={styles.breathingCircleContainer}>
                   <Animated.View
@@ -2371,7 +1369,7 @@ export default function App() {
         ) : (
         <View style={styles.alarmScreen}>
           <Text style={styles.alarmScreenTime}>
-            {activeAlarm ? formatAlarmTime(activeAlarm.hour, activeAlarm.minute) : ''}
+            {activeAlarm ? formatTimeWithPeriod(activeAlarm.hour, activeAlarm.minute) : ''}
           </Text>
           {activeAlarm?.label ? (
             <Text style={styles.alarmScreenLabel}>{activeAlarm.label}</Text>
@@ -2419,7 +1417,7 @@ export default function App() {
               hapticFeedback={settings.hapticFeedback}
             />
 
-            <TouchableOpacity style={styles.saveBedtimeButton} onPress={handleSaveBedtime}>
+            <TouchableOpacity style={styles.saveBedtimeButton} onPress={handleSaveBedtimeWithInsight}>
               <Text style={styles.saveBedtimeButtonText}>Save</Text>
             </TouchableOpacity>
 
@@ -2458,12 +1456,12 @@ export default function App() {
                     For optimal rest (8 hours), try waking up at:
                   </Text>
                   <Text style={styles.insightTime}>
-                    {formatAlarmTime(insight.hour, insight.minute)}
+                    {formatTimeWithPeriod(insight.hour, insight.minute)}
                   </Text>
                   <TouchableOpacity
                     style={styles.insightButton}
                     onPress={() => {
-                      handleAddAlarm();
+                      handleAddAlarmWithDefaults();
                       setSelectedHour(insight.hour);
                       setSelectedMinute(insight.minute);
                       setSelectedLabel('Optimal Wake');
@@ -2633,6 +1631,7 @@ export default function App() {
         </View>
       </Modal>
     </LinearGradient>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

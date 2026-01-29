@@ -7,9 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "plugins": [
-      "./plugins/withAlarmSound"
-    ],
+    "plugins": [],
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
