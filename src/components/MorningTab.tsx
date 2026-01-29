@@ -1,10 +1,5 @@
-/**
- * MorningTab Component
- * Morning greeting screen with quick actions
- */
-
 import React from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import type { Theme } from '../types';
 
@@ -22,21 +17,17 @@ export function MorningTab({ theme, hapticFeedback }: MorningTabProps) {
   };
 
   const handleDeepBreath = () => {
-    if (hapticFeedback) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+    if (hapticFeedback) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert('Deep Breath', 'Breathe in... hold... breathe out...');
   };
 
   const handleSetIntention = () => {
-    if (hapticFeedback) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+    if (hapticFeedback) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert('Set Intention', 'What do you want to focus on today?');
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.tabContent}>
       <View style={styles.morningContainer}>
         <Text style={[styles.morningGreeting, { color: theme.text }]}>
           {getGreeting()}
@@ -66,8 +57,10 @@ export function MorningTab({ theme, hapticFeedback }: MorningTabProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  tabContent: {
     flex: 1,
+    paddingTop: 60,
+    paddingHorizontal: 24,
   },
   morningContainer: {
     flex: 1,
@@ -78,12 +71,10 @@ const styles = StyleSheet.create({
   morningGreeting: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#FFFFFF',
     marginBottom: 12,
   },
   morningQuote: {
     fontSize: 16,
-    color: '#9999AA',
     fontStyle: 'italic',
     textAlign: 'center',
     marginBottom: 48,
@@ -93,12 +84,11 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   morningButton: {
-    backgroundColor: 'rgba(129, 140, 248, 0.15)',
     borderRadius: 16,
     paddingVertical: 20,
     paddingHorizontal: 24,
     alignItems: 'center',
-    flex: 1,
+    minWidth: 130,
   },
   morningButtonIcon: {
     fontSize: 28,
@@ -107,6 +97,5 @@ const styles = StyleSheet.create({
   morningButtonLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#818CF8',
   },
 });

@@ -44,6 +44,8 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { SettingsPanel } from './src/components/SettingsPanel';
 import { AlarmsList } from './src/components/AlarmsList';
 import { AlarmsTab } from './src/components/AlarmsTab';
+import { MorningTab } from './src/components/MorningTab';
+import { AlarmScreen } from './src/components/AlarmScreen';
 import { AlarmEditor } from './src/components/AlarmEditor';
 import { TimePicker } from './src/components/TimePicker';
 import { useAlarms } from './src/hooks/useAlarms';
@@ -512,43 +514,7 @@ export default function App() {
       )}
 
       {activeTab === 'morning' && (
-        <View style={styles.tabContent}>
-          <View style={styles.morningContainer}>
-            <Text style={[styles.morningGreeting, { color: theme.text }]}>
-              {(() => {
-                const h = new Date().getHours();
-                if (h < 12) return 'Good morning';
-                if (h < 17) return 'Good afternoon';
-                return 'Good evening';
-              })()}
-            </Text>
-            <Text style={[styles.morningQuote, { color: theme.textMuted }]}>
-              "Today is full of possibilities"
-            </Text>
-            <View style={styles.morningButtons}>
-              <TouchableOpacity
-                style={[styles.morningButton, { backgroundColor: theme.card }]}
-                onPress={() => {
-                  if (settings.hapticFeedback) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  Alert.alert('Deep Breath', 'Breathe in... hold... breathe out...');
-                }}
-              >
-                <Text style={styles.morningButtonIcon}>🌬️</Text>
-                <Text style={[styles.morningButtonLabel, { color: theme.text }]}>Deep Breath</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.morningButton, { backgroundColor: theme.card }]}
-                onPress={() => {
-                  if (settings.hapticFeedback) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  Alert.alert('Set Intention', 'What do you want to focus on today?');
-                }}
-              >
-                <Text style={styles.morningButtonIcon}>🎯</Text>
-                <Text style={[styles.morningButtonLabel, { color: theme.text }]}>Set Intention</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+        <MorningTab theme={theme} hapticFeedback={settings.hapticFeedback} />
       )}
 
       {activeTab === 'insights' && (
@@ -658,199 +624,29 @@ export default function App() {
       />
 
       {/* Alarm Dismiss Screen */}
-      <Modal
-        animationType="fade"
-        transparent={false}
+      <AlarmScreen
         visible={alarmScreenVisible}
-        onRequestClose={() => {}}
-      >
-        {activeAlarm?.dismissType === 'breathing' ? (
-          <LinearGradient
-            colors={['#1a1a3e', '#2d1b69', '#1a3a5c']}
-            style={styles.breathingScreen}
-          >
-            {breathingPhase === 'complete' ? (
-              <View style={styles.breathingCompleteContainer}>
-                <Text style={styles.breathingGoodMorning}>Good morning</Text>
-                {activeAlarm?.label ? (
-                  <Text style={styles.breathingCompleteLabel}>{activeAlarm.label}</Text>
-                ) : null}
-              </View>
-            ) : (
-              <View style={styles.breathingContent}>
-                <Text style={styles.breathingTimeText}>
-                  {activeAlarm ? formatTimeWithPeriod(activeAlarm.hour, activeAlarm.minute) : ''}
-                </Text>
-                <View style={styles.breathingCircleContainer}>
-                  <Animated.View
-                    style={[
-                      styles.breathingCircle,
-                      {
-                        transform: [{ scale: breathingAnim }],
-                        opacity: breathingAnim.interpolate({
-                          inputRange: [0.4, 1.0],
-                          outputRange: [0.6, 1.0],
-                        }),
-                      },
-                    ]}
-                  />
-                  <View style={styles.breathingCircleInner}>
-                    <Text style={styles.breathingPhaseLabel}>
-                      {breathingPhase === 'inhale' && 'Breathe in'}
-                      {breathingPhase === 'hold' && 'Hold'}
-                      {breathingPhase === 'exhale' && 'Breathe out'}
-                    </Text>
-                    <Text style={styles.breathingPhaseDuration}>
-                      {breathingPhase === 'inhale' && '4 seconds'}
-                      {breathingPhase === 'hold' && '7 seconds'}
-                      {breathingPhase === 'exhale' && '8 seconds'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.breathingCycleProgress}>
-                  Breath {breathingCycle + 1} of {BREATHING_CYCLES_REQUIRED}
-                </Text>
-              </View>
-            )}
-          </LinearGradient>
-        ) : activeAlarm?.dismissType === 'affirmation' ? (
-          <LinearGradient
-            colors={['#0a0a1a', '#1a1a2e', '#0f0f23']}
-            style={styles.affirmationScreen}
-          >
-            {affirmationComplete ? (
-              <View style={styles.affirmationCompleteContainer}>
-                <Text style={styles.affirmationWellDone}>Well done</Text>
-              </View>
-            ) : (
-              <View style={styles.affirmationContent}>
-                <Text style={styles.affirmationPrompt}>Type to start your day</Text>
-                <View style={styles.affirmationTargetContainer}>
-                  <View style={styles.affirmationCharRow}>
-                    {targetAffirmation.split('').map((char, index) => {
-                      const isTyped = index < affirmationText.length;
-                      const isCorrect = isTyped && affirmationText[index]?.toLowerCase() === char.toLowerCase();
-                      const isWrong = isTyped && !isCorrect;
-                      return (
-                        <Text
-                          key={index}
-                          style={[
-                            styles.affirmationChar,
-                            isCorrect && styles.affirmationCharCorrect,
-                            isWrong && styles.affirmationCharWrong,
-                          ]}
-                        >
-                          {char}
-                        </Text>
-                      );
-                    })}
-                  </View>
-                </View>
-                <TextInput
-                  style={styles.affirmationInput}
-                  value={affirmationText}
-                  onChangeText={handleAffirmationChange}
-                  placeholder="Start typing..."
-                  placeholderTextColor="rgba(255, 255, 255, 0.3)"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoFocus
-                />
-              </View>
-            )}
-          </LinearGradient>
-        ) : activeAlarm?.dismissType === 'shake' ? (
-          <LinearGradient
-            colors={['#0a0a1a', '#1a1a2e', '#0f0f23']}
-            style={styles.shakeScreen}
-          >
-            {shakeComplete ? (
-              <View style={styles.shakeCompleteContainer}>
-                <Text style={styles.shakeCompleteText}>You're awake!</Text>
-              </View>
-            ) : (
-              <View style={styles.shakeContent}>
-                <Text style={styles.shakePrompt}>Shake your phone to wake up</Text>
-                <Text style={styles.shakeScreenIcon}>📳</Text>
-                <View style={styles.shakeProgressContainer}>
-                  <View style={styles.shakeProgressBar}>
-                    <View
-                      style={[
-                        styles.shakeProgressFill,
-                        { width: `${(shakeCount / REQUIRED_SHAKES) * 100}%` },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.shakeProgressText}>
-                    {shakeCount} / {REQUIRED_SHAKES}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </LinearGradient>
-        ) : activeAlarm?.dismissType === 'math' ? (
-          <LinearGradient
-            colors={['#0a0a1a', '#1a1a2e', '#0f0f23']}
-            style={styles.mathScreen}
-          >
-            {mathComplete ? (
-              <View style={styles.mathCompleteContainer}>
-                <Text style={styles.mathCompleteText}>Correct!</Text>
-              </View>
-            ) : (
-              <View style={styles.mathContent}>
-                <Text style={styles.mathPrompt}>Solve to start your day</Text>
-                <Text style={styles.mathProblemText}>{mathProblem.question} = ?</Text>
-                <TextInput
-                  style={[
-                    styles.mathInputField,
-                    wrongAnswer && styles.mathInputFieldWrong,
-                  ]}
-                  value={userAnswer}
-                  onChangeText={setUserAnswer}
-                  keyboardType="number-pad"
-                  placeholder="Your answer"
-                  placeholderTextColor="rgba(255, 255, 255, 0.3)"
-                  autoFocus
-                />
-                <TouchableOpacity
-                  style={styles.mathSubmitButton}
-                  onPress={handleMathDismiss}
-                >
-                  <Text style={styles.mathSubmitButtonText}>Submit</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </LinearGradient>
-        ) : (
-        <View style={styles.alarmScreen}>
-          <Text style={styles.alarmScreenTime}>
-            {activeAlarm ? formatTimeWithPeriod(activeAlarm.hour, activeAlarm.minute) : ''}
-          </Text>
-          {activeAlarm?.label ? (
-            <Text style={styles.alarmScreenLabel}>{activeAlarm.label}</Text>
-          ) : null}
-          <View style={styles.simpleDismissContainer}>
-            <TouchableOpacity
-              style={styles.stopButton}
-              onPress={handleSimpleDismiss}
-            >
-              <Text style={styles.stopButtonText}>Stop</Text>
-            </TouchableOpacity>
-          </View>
-          {activeAlarm && activeAlarm.snooze > 0 && (
-            <TouchableOpacity
-              style={styles.snoozeButton}
-              onPress={handleSnoozeAlarm}
-            >
-              <Text style={styles.snoozeButtonText}>
-                Snooze ({activeAlarm.snooze} min)
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        )}
-      </Modal>
+        activeAlarm={activeAlarm}
+        theme={theme}
+        breathingPhase={breathingPhase}
+        breathingCycle={breathingCycle}
+        breathingAnim={breathingAnim}
+        affirmationComplete={affirmationComplete}
+        targetAffirmation={targetAffirmation}
+        affirmationText={affirmationText}
+        onAffirmationChange={handleAffirmationChange}
+        shakeComplete={shakeComplete}
+        shakeCount={shakeCount}
+        mathComplete={mathComplete}
+        mathProblem={mathProblem}
+        userAnswer={userAnswer}
+        wrongAnswer={wrongAnswer}
+        onMathAnswerChange={setUserAnswer}
+        onMathSubmit={handleMathDismiss}
+        onSnooze={handleSnoozeAlarm}
+        onDismiss={handleUnifiedDismiss}
+        onSimpleDismiss={handleSimpleDismiss}
+      />
 
       {/* Bedtime Logging Modal */}
       <Modal
