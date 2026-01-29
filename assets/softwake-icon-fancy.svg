@@ -1,0 +1,178 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Rich dark background -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1033"/>
+      <stop offset="50%" style="stop-color:#0d0618"/>
+      <stop offset="100%" style="stop-color:#1a0a2e"/>
+    </linearGradient>
+    
+    <!-- Premium purple-blue gradient for clock body -->
+    <linearGradient id="clockBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a855f7"/>
+      <stop offset="50%" style="stop-color:#7c3aed"/>
+      <stop offset="100%" style="stop-color:#6366f1"/>
+    </linearGradient>
+    
+    <!-- Shiny bell gradient -->
+    <linearGradient id="bellGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e9d5ff"/>
+      <stop offset="30%" style="stop-color:#c084fc"/>
+      <stop offset="70%" style="stop-color:#9333ea"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+    
+    <!-- Warm glowing moon -->
+    <linearGradient id="moonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fffef5"/>
+      <stop offset="40%" style="stop-color:#fef3c7"/>
+      <stop offset="100%" style="stop-color:#fcd34d"/>
+    </linearGradient>
+    
+    <!-- Inner face gradient -->
+    <radialGradient id="faceGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" style="stop-color:#1e1b4b"/>
+      <stop offset="100%" style="stop-color:#0a0612"/>
+    </radialGradient>
+    
+    <!-- Glows -->
+    <filter id="bellGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <filter id="moonGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+    
+    <filter id="innerShadow">
+      <feOffset dx="0" dy="4"/>
+      <feGaussianBlur stdDeviation="6"/>
+      <feComposite operator="out" in="SourceGraphic"/>
+      <feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.4 0"/>
+      <feBlend in="SourceGraphic"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="512" height="512" rx="108" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle star field -->
+  <g fill="#ffffff">
+    <circle cx="60" cy="70" r="1.5" opacity="0.4"/>
+    <circle cx="450" cy="90" r="2" opacity="0.3"/>
+    <circle cx="80" cy="440" r="1.5" opacity="0.3"/>
+    <circle cx="440" cy="420" r="1" opacity="0.4"/>
+    <circle cx="100" cy="200" r="1" opacity="0.2"/>
+    <circle cx="420" cy="250" r="1.5" opacity="0.2"/>
+    <circle cx="50" cy="300" r="1" opacity="0.3"/>
+    <circle cx="470" cy="340" r="1" opacity="0.25"/>
+  </g>
+  
+  <!-- Left bell with shine -->
+  <ellipse cx="125" cy="118" rx="55" ry="50" fill="url(#bellGrad)" filter="url(#bellGlow)"/>
+  <ellipse cx="115" cy="100" rx="20" ry="12" fill="#f5f3ff" opacity="0.4"/>
+  <circle cx="125" cy="78" r="14" fill="#c084fc"/>
+  <circle cx="125" cy="78" r="8" fill="#e9d5ff"/>
+  <ellipse cx="122" cy="76" rx="3" ry="2" fill="#ffffff" opacity="0.8"/>
+  
+  <!-- Right bell with shine -->
+  <ellipse cx="387" cy="118" rx="55" ry="50" fill="url(#bellGrad)" filter="url(#bellGlow)"/>
+  <ellipse cx="377" cy="100" rx="20" ry="12" fill="#f5f3ff" opacity="0.4"/>
+  <circle cx="387" cy="78" r="14" fill="#c084fc"/>
+  <circle cx="387" cy="78" r="8" fill="#e9d5ff"/>
+  <ellipse cx="384" cy="76" rx="3" ry="2" fill="#ffffff" opacity="0.8"/>
+  
+  <!-- Bell connector - curved elegant bar -->
+  <path d="M145 88 Q256 55 367 88" fill="none" stroke="url(#bellGrad)" stroke-width="10" stroke-linecap="round"/>
+  
+  <!-- Hammer/striker - fancy -->
+  <rect x="238" y="52" width="36" height="55" rx="10" fill="url(#bellGrad)"/>
+  <ellipse cx="256" cy="48" rx="22" ry="18" fill="#c084fc"/>
+  <ellipse cx="252" cy="44" rx="8" ry="5" fill="#f5f3ff" opacity="0.5"/>
+  
+  <!-- Clock body - main circle with shadow -->
+  <circle cx="256" cy="295" r="165" fill="url(#clockBody)" filter="url(#shadow)"/>
+  
+  <!-- Body highlight -->
+  <ellipse cx="200" cy="200" rx="70" ry="45" fill="#e9d5ff" opacity="0.15"/>
+  
+  <!-- Clock face - inner circle -->
+  <circle cx="256" cy="295" r="142" fill="url(#faceGrad)" filter="url(#innerShadow)"/>
+  
+  <!-- Inner ring accent -->
+  <circle cx="256" cy="295" r="138" fill="none" stroke="#7c3aed" stroke-width="2" opacity="0.4"/>
+  <circle cx="256" cy="295" r="130" fill="none" stroke="#6366f1" stroke-width="1" opacity="0.2"/>
+  
+  <!-- Hour markers - elegant diamonds -->
+  <g fill="#a78bfa">
+    <rect x="250" y="163" width="12" height="20" rx="3" transform="rotate(0 256 173)"/>
+    <rect x="383" y="289" width="20" height="12" rx="3"/>
+    <rect x="250" y="407" width="12" height="20" rx="3"/>
+    <rect x="109" y="289" width="20" height="12" rx="3"/>
+  </g>
+  
+  <!-- Small hour markers -->
+  <g fill="#7c3aed" opacity="0.7">
+    <circle cx="320" cy="178" r="4"/>
+    <circle cx="370" cy="228" r="4"/>
+    <circle cx="370" cy="362" r="4"/>
+    <circle cx="320" cy="412" r="4"/>
+    <circle cx="192" cy="412" r="4"/>
+    <circle cx="142" cy="362" r="4"/>
+    <circle cx="142" cy="228" r="4"/>
+    <circle cx="192" cy="178" r="4"/>
+  </g>
+  
+  <!-- Moon - glowing crescent -->
+  <g filter="url(#moonGlow)">
+    <circle cx="256" cy="295" r="72" fill="url(#moonGrad)"/>
+    <circle cx="292" cy="268" r="60" fill="url(#faceGrad)"/>
+  </g>
+  
+  <!-- Moon surface details -->
+  <g fill="#fef3c7" opacity="0.5">
+    <circle cx="218" cy="315" r="8"/>
+    <circle cx="230" cy="348" r="5"/>
+    <circle cx="200" cy="290" r="4"/>
+    <circle cx="215" cy="275" r="3"/>
+  </g>
+  
+  <!-- Moon inner glow edge -->
+  <circle cx="256" cy="295" r="72" fill="none" stroke="#fef9c3" stroke-width="2" opacity="0.3"/>
+  
+  <!-- Clock hands - sleek with glow -->
+  <g filter="url(#bellGlow)">
+    <!-- Hour hand -->
+    <line x1="256" y1="295" x2="198" y2="245" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+    <line x1="256" y1="295" x2="200" y2="247" stroke="#e9d5ff" stroke-width="4" stroke-linecap="round"/>
+    
+    <!-- Minute hand -->
+    <line x1="256" y1="295" x2="315" y2="208" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+    <line x1="256" y1="295" x2="314" y2="210" stroke="#e9d5ff" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Center cap - jewel style -->
+  <circle cx="256" cy="295" r="14" fill="#e9d5ff"/>
+  <circle cx="256" cy="295" r="10" fill="#a855f7"/>
+  <circle cx="256" cy="295" r="5" fill="#e9d5ff"/>
+  <ellipse cx="253" cy="292" rx="2" ry="1.5" fill="#ffffff" opacity="0.8"/>
+  
+  <!-- Feet - metallic style -->
+  <ellipse cx="168" cy="458" rx="32" ry="18" fill="url(#bellGrad)"/>
+  <ellipse cx="160" cy="454" rx="12" ry="6" fill="#f5f3ff" opacity="0.3"/>
+  
+  <ellipse cx="344" cy="458" rx="32" ry="18" fill="url(#bellGrad)"/>
+  <ellipse cx="336" cy="454" rx="12" ry="6" fill="#f5f3ff" opacity="0.3"/>
+</svg>

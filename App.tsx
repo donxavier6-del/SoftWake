@@ -11,6 +11,7 @@ import {
   Animated,
   TextInput,
   Platform,
+  AppState,
   Alert,
 } from 'react-native';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
@@ -22,6 +23,8 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { nativeAlarm } from './src/services/nativeAlarm';
+import { rescheduleAllAlarms, cleanupExpiredAlarms } from './src/services/alarmStorage';
 
 // Check if running in Expo Go (where push notifications are not supported in SDK 53+)
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -452,6 +455,22 @@ export default function App() {
   const [userAnswer, setUserAnswer] = useState('');
   const [wrongAnswer, setWrongAnswer] = useState(false);
   const [mathComplete, setMathComplete] = useState(false);
+
+// Initialize native alarm system
+  useEffect(() => {
+    const initNativeAlarms = async () => {
+      if (Platform.OS !== 'android') return;
+      await rescheduleAllAlarms();
+      await cleanupExpiredAlarms();
+    };
+    initNativeAlarms();
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') rescheduleAllAlarms();
+    });
+
+    return () => sub.remove();
+  }, []);
 
   // Breathing exercise state
   const [breathingPhase, setBreathingPhase] = useState<'inhale' | 'hold' | 'exhale' | 'complete'>('inhale');
