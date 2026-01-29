@@ -784,6 +784,12 @@ export default function App() {
       await soundRef.current.unloadAsync();
       soundRef.current = null;
     }
+    // Stop the native Android alarm service (MediaPlayer + vibration)
+    try {
+      await nativeAlarm.stopAlarm();
+    } catch (e) {
+      // May fail if no native alarm is active - that's fine
+    }
   };
 
   // Sound preview is now handled by useAlarmSound hook
