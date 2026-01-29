@@ -47,6 +47,10 @@ import { SettingsPanel } from './src/components/SettingsPanel';
 import { AlarmsList } from './src/components/AlarmsList';
 import { AlarmEditor } from './src/components/AlarmEditor';
 import { TimePicker } from './src/components/TimePicker';
+import { useAlarms } from './src/hooks/useAlarms';
+import { useSettings } from './src/hooks/useSettings';
+import { useAlarmSound } from './src/hooks/useAlarmSound';
+import { useSleepTracking } from './src/hooks/useSleepTracking';
 
 // Check if running in Expo Go (where push notifications are not supported in SDK 53+)
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -172,9 +176,69 @@ const generateMathProblem = (): MathProblem => {
 };
 
 export default function App() {
+  // === HOOKS ===
+  // Settings hook (must be first to get theme)
+  const { settings, updateSettings, isLoading: settingsLoading } = useSettings();
+  const theme = settings.darkMode ? THEMES.dark : THEMES.light;
+
+  // Alarms hook
+  const {
+    alarms,
+    setAlarms,
+    modalVisible,
+    setModalVisible,
+    editingAlarmId,
+    setEditingAlarmId,
+    selectedHour,
+    setSelectedHour,
+    selectedMinute,
+    setSelectedMinute,
+    selectedDays,
+    setSelectedDays,
+    selectedLabel,
+    setSelectedLabel,
+    selectedSnooze,
+    setSelectedSnooze,
+    selectedWakeIntensity,
+    setSelectedWakeIntensity,
+    selectedSound,
+    setSelectedSound,
+    selectedDismissType,
+    setSelectedDismissType,
+    handleAddAlarm,
+    handleEditAlarm,
+    handleSaveAlarm,
+    toggleAlarm,
+    deleteAlarm,
+    toggleDay,
+    showUndoToast,
+    undoDelete,
+    isLoaded: alarmsLoaded,
+  } = useAlarms();
+
+  // Sleep tracking hook
+  const {
+    sleepData,
+    bedtimeModalVisible,
+    setBedtimeModalVisible,
+    bedtimeHour,
+    setBedtimeHour,
+    bedtimeMinute,
+    setBedtimeMinute,
+    pendingWakeTime,
+    setPendingWakeTime,
+    getWeeklyData,
+    getSleepStats,
+    handleSaveBedtime,
+    handleSkipBedtime,
+    isLoading: sleepLoading,
+  } = useSleepTracking();
+
+  // Alarm sound preview hook
+  const { playPreviewSound, stopPreviewSound } = useAlarmSound();
+
+  // === LOCAL STATE ===
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [modalVisible, setModalVisible] = useState(false);
-  const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [alarmScreenVisible, setAlarmScreenVisible] = useState(false);
   const [activeAlarm, setActiveAlarm] = useState<Alarm | null>(null);
   const [mathProblem, setMathProblem] = useState<MathProblem>(generateMathProblem());
@@ -209,45 +273,26 @@ export default function App() {
   const [targetAffirmation, setTargetAffirmation] = useState(AFFIRMATIONS[0]);
   const [affirmationComplete, setAffirmationComplete] = useState(false);
 
-  // New alarm state
-  const [selectedHour, setSelectedHour] = useState(8);
-  const [selectedMinute, setSelectedMinute] = useState(0);
-  const [selectedDays, setSelectedDays] = useState<boolean[]>([
-    false, false, false, false, false, false, false,
-  ]);
-  const [selectedLabel, setSelectedLabel] = useState('');
-  const [selectedSnooze, setSelectedSnooze] = useState(10);
-  const [selectedWakeIntensity, setSelectedWakeIntensity] = useState<WakeIntensity>('energetic');
-  const [selectedSound, setSelectedSound] = useState<AlarmSound>('sunrise');
-  const [selectedDismissType, setSelectedDismissType] = useState<DismissType>('simple');
-  const [editingAlarmId, setEditingAlarmId] = useState<string | null>(null);
+  // New alarm state - now from useAlarms hook
 
   // Shake detection state
   const [shakeCount, setShakeCount] = useState(0);
   const [shakeComplete, setShakeComplete] = useState(false);
   const lastShakeTime = useRef<number>(0);
 
-  // Undo delete state
-  const [deletedAlarm, setDeletedAlarm] = useState<Alarm | null>(null);
-  const [showUndoToast, setShowUndoToast] = useState(false);
-  const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Undo delete state - now from useAlarms hook
 
-  // Sleep tracking state
-  const [sleepData, setSleepData] = useState<SleepEntry[]>([]);
-  const [bedtimeModalVisible, setBedtimeModalVisible] = useState(false);
-  const [bedtimeHour, setBedtimeHour] = useState(22);
-  const [bedtimeMinute, setBedtimeMinute] = useState(0);
-  const [pendingWakeTime, setPendingWakeTime] = useState<Date | null>(null);
+  // Sleep tracking state - now from useSleepTracking hook
+  // Keep sleepInsightVisible locally (UI state, not data state)
   const [sleepInsightVisible, setSleepInsightVisible] = useState(false);
 
   // Audio
   const soundRef = useRef<Audio.Sound | null>(null);
   const lastTriggeredRef = useRef<string>('');
-  const [isLoaded, setIsLoaded] = useState(false);
+  // Combined loading state from hooks
+  const isLoaded = alarmsLoaded && !settingsLoading && !sleepLoading;
 
-  // Settings state
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const theme = settings.darkMode ? THEMES.dark : THEMES.light;
+  // Settings state - now from useSettings hook
   const [bedtimePickerVisible, setBedtimePickerVisible] = useState(false);
 
   // Stats modal state
@@ -256,73 +301,20 @@ export default function App() {
   // Tab navigation state
   const [activeTab, setActiveTab] = useState<TabName>('alarms');
 
-  // Load alarms, sleep data, and settings from storage on mount
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [storedAlarms, storedSleep, storedSettings] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEY),
-          AsyncStorage.getItem(SLEEP_STORAGE_KEY),
-          AsyncStorage.getItem(SETTINGS_STORAGE_KEY),
-        ]);
-        if (storedAlarms) {
-          setAlarms(JSON.parse(storedAlarms));
-        }
-        if (storedSleep) {
-          setSleepData(JSON.parse(storedSleep));
-        }
-        if (storedSettings) {
-          const parsedSettings = JSON.parse(storedSettings);
-          setSettings({ ...DEFAULT_SETTINGS, ...parsedSettings });
-        }
-      } catch (error) {
-        console.log('Error loading data:', error);
-      } finally {
-        setIsLoaded(true);
-      }
-    };
-    loadData();
-  }, []);
+  // Loading is now handled by hooks (useAlarms, useSettings, useSleepTracking)
 
-  // Save alarms to storage and schedule notifications whenever they change
+  // Schedule alarm notifications whenever alarms change (AsyncStorage save handled by useAlarms hook)
   useEffect(() => {
     if (!isLoaded) return;
-    const saveAlarmsAndSchedule = async () => {
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(alarms));
-        await scheduleAlarmNotifications(alarms);
-      } catch (error) {
-        console.log('Error saving alarms:', error);
-      }
-    };
-    saveAlarmsAndSchedule();
+    scheduleAlarmNotifications(alarms);
   }, [alarms, isLoaded]);
 
-  // Save sleep data to storage whenever it changes
-  useEffect(() => {
-    if (!isLoaded) return;
-    const saveSleepData = async () => {
-      try {
-        await AsyncStorage.setItem(SLEEP_STORAGE_KEY, JSON.stringify(sleepData));
-      } catch (error) {
-        console.log('Error saving sleep data:', error);
-      }
-    };
-    saveSleepData();
-  }, [sleepData, isLoaded]);
+  // Sleep data save is now handled by useSleepTracking hook
 
-  // Save settings and schedule bedtime notification
+  // Schedule bedtime notification when settings change (AsyncStorage save handled by useSettings hook)
   useEffect(() => {
     if (!isLoaded) return;
-    const saveSettingsAndSchedule = async () => {
-      try {
-        await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-        await scheduleBedtimeNotification();
-      } catch (error) {
-        console.log('Error saving settings:', error);
-      }
-    };
-    saveSettingsAndSchedule();
+    scheduleBedtimeNotification();
   }, [settings, isLoaded]);
 
   // Request notification permissions on mount (only in development builds, not Expo Go)
@@ -794,60 +786,7 @@ export default function App() {
     }
   };
 
-  const previewSoundRef = useRef<Audio.Sound | null>(null);
-  const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isPreviewPlayingRef = useRef<boolean>(false);
-
-  const stopPreviewSound = async () => {
-    if (previewTimeoutRef.current) {
-      clearTimeout(previewTimeoutRef.current);
-      previewTimeoutRef.current = null;
-    }
-    if (previewSoundRef.current) {
-      try {
-        await previewSoundRef.current.stopAsync();
-        await previewSoundRef.current.unloadAsync();
-      } catch (e) {
-        // Sound may already be stopped/unloaded
-      }
-      previewSoundRef.current = null;
-    }
-    isPreviewPlayingRef.current = false;
-  };
-
-  const playPreviewSound = async () => {
-    // Prevent concurrent calls
-    if (isPreviewPlayingRef.current) {
-      await stopPreviewSound();
-    }
-    isPreviewPlayingRef.current = true;
-
-    try {
-      const intensityOption = WAKE_INTENSITY_OPTIONS.find(o => o.value === selectedWakeIntensity);
-      const volume = intensityOption ? intensityOption.volume : 0.5;
-      const config = SOUND_CONFIGS[selectedSound];
-
-      const { sound } = await Audio.Sound.createAsync(
-        require('./assets/alarm-sound.mp3'),
-        {
-          volume,
-          rate: config.rate,
-          shouldCorrectPitch: false,
-        }
-      );
-
-      previewSoundRef.current = sound;
-      await sound.playAsync();
-
-      // Stop after 2 seconds
-      previewTimeoutRef.current = setTimeout(async () => {
-        await stopPreviewSound();
-      }, 2000);
-    } catch (error) {
-      console.log('Error playing preview:', error);
-      isPreviewPlayingRef.current = false;
-    }
-  };
+  // Sound preview is now handled by useAlarmSound hook
 
   const handleDismissAlarm = async () => {
     // Validate numeric input
@@ -965,124 +904,30 @@ export default function App() {
     }
   };
 
-  const handleAddAlarm = () => {
-    setEditingAlarmId(null);
-    setSelectedHour(8);
-    setSelectedMinute(0);
-    setSelectedDays([false, false, false, false, false, false, false]);
-    setSelectedLabel('');
-    setSelectedSnooze(10);
-    setSelectedWakeIntensity(settings.defaultWakeIntensity);
-    setSelectedSound(settings.defaultSound);
-    setSelectedDismissType(settings.defaultDismissType);
-    setModalVisible(true);
+  // Wrapper functions that pass app-specific context to hook functions
+  const handleAddAlarmWithDefaults = () => {
+    handleAddAlarm({
+      defaultWakeIntensity: settings.defaultWakeIntensity,
+      defaultSound: settings.defaultSound,
+      defaultDismissType: settings.defaultDismissType,
+    });
   };
 
-  const handleEditAlarm = (alarm: Alarm) => {
-    setEditingAlarmId(alarm.id);
-    setSelectedHour(alarm.hour);
-    setSelectedMinute(alarm.minute);
-    setSelectedDays([...alarm.days]);
-    setSelectedLabel(alarm.label);
-    setSelectedSnooze(alarm.snooze);
-    setSelectedWakeIntensity(alarm.wakeIntensity || 'energetic');
-    setSelectedSound(alarm.sound || 'sunrise');
-    const dismissType = (alarm.dismissType as string) === 'off' ? 'simple' : (alarm.dismissType || 'simple');
-    setSelectedDismissType(dismissType);
-    setModalVisible(true);
+  const handleSaveAlarmWithCleanup = () => {
+    handleSaveAlarm(() => stopPreviewSound());
   };
 
-  const toggleDay = (index: number) => {
-    const newDays = [...selectedDays];
-    newDays[index] = !newDays[index];
-    setSelectedDays(newDays);
+  const deleteAlarmWithHaptics = (id: string) => {
+    deleteAlarm(id, settings.hapticFeedback);
   };
 
-  const handleSaveAlarm = () => {
-    stopPreviewSound();
-    if (editingAlarmId) {
-      // Update existing alarm
-      setAlarms(alarms.map((alarm) =>
-        alarm.id === editingAlarmId
-          ? {
-              ...alarm,
-              hour: selectedHour,
-              minute: selectedMinute,
-              days: selectedDays,
-              label: selectedLabel,
-              snooze: selectedSnooze,
-              wakeIntensity: selectedWakeIntensity,
-              sound: selectedSound,
-              dismissType: selectedDismissType,
-            }
-          : alarm
-      ));
-    } else {
-      // Create new alarm
-      const newAlarm: Alarm = {
-        id: Date.now().toString(),
-        hour: selectedHour,
-        minute: selectedMinute,
-        days: selectedDays,
-        enabled: true,
-        label: selectedLabel,
-        snooze: selectedSnooze,
-        wakeIntensity: selectedWakeIntensity,
-        sound: selectedSound,
-        dismissType: selectedDismissType,
-      };
-      setAlarms([...alarms, newAlarm]);
-    }
-    setModalVisible(false);
-    setEditingAlarmId(null);
+  const playPreviewSoundWithCurrentSettings = () => {
+    playPreviewSound(selectedSound, selectedWakeIntensity);
   };
 
-  const toggleAlarm = (id: string) => {
-    setAlarms(alarms.map((alarm) =>
-      alarm.id === id ? { ...alarm, enabled: !alarm.enabled } : alarm
-    ));
-  };
+  // handleEditAlarm, toggleAlarm, toggleDay, undoDelete are used directly from useAlarms hook
 
-  const deleteAlarm = (id: string) => {
-    const alarmToDelete = alarms.find((alarm) => alarm.id === id);
-    if (!alarmToDelete) return;
-
-    // Clear any existing undo timer
-    if (undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-    }
-
-    // Store deleted alarm for undo
-    setDeletedAlarm(alarmToDelete);
-    setShowUndoToast(true);
-    setAlarms(alarms.filter((alarm) => alarm.id !== id));
-
-    // Haptic feedback
-    if (settings.hapticFeedback) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-
-    // Auto-hide toast after 3 seconds
-    undoTimerRef.current = setTimeout(() => {
-      setShowUndoToast(false);
-      setDeletedAlarm(null);
-    }, 3000);
-  };
-
-  const undoDelete = () => {
-    if (deletedAlarm) {
-      setAlarms((prev) => [...prev, deletedAlarm]);
-      setDeletedAlarm(null);
-      setShowUndoToast(false);
-      if (undoTimerRef.current) {
-        clearTimeout(undoTimerRef.current);
-      }
-    }
-  };
-
-  const updateSettings = (partial: Partial<Settings>) => {
-    setSettings((prev) => ({ ...prev, ...partial }));
-  };
+  // updateSettings is now from useSettings hook
 
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -1090,128 +935,24 @@ export default function App() {
     return `${hours}h ${mins}m`;
   };
 
-  const getWeeklyData = (): WeeklyDataPoint[] => {
-    const now = new Date();
-    const weekData: WeeklyDataPoint[] = [];
+  // getWeeklyData, getSleepStats, handleSkipBedtime are now from useSleepTracking hook
 
-    // Get last 7 days
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(now);
-      date.setDate(date.getDate() - i);
-      date.setHours(0, 0, 0, 0);
+  // Track previous sleep data length to detect when we reach 7 entries
+  const prevSleepLengthRef = useRef(sleepData.length);
 
-      const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
-
-      // Find sleep entry for this day (based on wake time)
-      const entry = sleepData.find((e) => {
-        const wakeDate = new Date(e.wakeTime);
-        return wakeDate >= date && wakeDate < nextDate;
-      });
-
-      weekData.push({
-        day: DAYS[date.getDay()],
-        duration: entry ? entry.sleepDuration : 0,
-        date,
-      });
-    }
-
-    return weekData;
+  // Wrapper to show sleep insight after saving bedtime
+  const handleSaveBedtimeWithInsight = () => {
+    prevSleepLengthRef.current = sleepData.length;
+    handleSaveBedtime();
   };
 
-  const getSleepStats = (): SleepStatsResult | null => {
-    if (sleepData.length === 0) {
-      return null;
-    }
-
-    const durations = sleepData.map((e) => e.sleepDuration);
-    const total = durations.reduce((sum, d) => sum + d, 0);
-    const average = Math.round(total / durations.length);
-
-    const best = sleepData.reduce((max, e) =>
-      e.sleepDuration > max.sleepDuration ? e : max
-    );
-    const worst = sleepData.reduce((min, e) =>
-      e.sleepDuration < min.sleepDuration ? e : min
-    );
-
-    // Calculate average bedtime
-    const bedtimeMinutes = sleepData.map((e) => {
-      const bed = new Date(e.bedtime);
-      let mins = bed.getHours() * 60 + bed.getMinutes();
-      if (mins < 720) mins += 1440; // After midnight, add 24h
-      return mins;
-    });
-    const avgBedtimeMinutes = Math.round(
-      bedtimeMinutes.reduce((sum, m) => sum + m, 0) / bedtimeMinutes.length
-    ) % 1440;
-    const avgBedtimeHour = Math.floor(avgBedtimeMinutes / 60);
-    const avgBedtimeMinute = avgBedtimeMinutes % 60;
-
-    // Calculate average wake time
-    const wakeMinutes = sleepData.map((e) => {
-      const wake = new Date(e.wakeTime);
-      return wake.getHours() * 60 + wake.getMinutes();
-    });
-    const avgWakeMinutes = Math.round(
-      wakeMinutes.reduce((sum, m) => sum + m, 0) / wakeMinutes.length
-    );
-    const avgWakeHour = Math.floor(avgWakeMinutes / 60);
-    const avgWakeMinute = avgWakeMinutes % 60;
-
-    return {
-      average,
-      best: {
-        duration: best.sleepDuration,
-        date: new Date(best.wakeTime),
-      },
-      worst: {
-        duration: worst.sleepDuration,
-        date: new Date(worst.wakeTime),
-      },
-      totalNights: sleepData.length,
-      avgBedtime: formatTimeWithPeriod(avgBedtimeHour, avgBedtimeMinute),
-      avgWakeTime: formatTimeWithPeriod(avgWakeHour, avgWakeMinute),
-    };
-  };
-
-  const handleSaveBedtime = () => {
-    if (!pendingWakeTime) return;
-
-    // Calculate bedtime timestamp (previous day if bedtime hour > wake hour)
-    const wakeTime = pendingWakeTime;
-    const bedtime = new Date(wakeTime);
-    bedtime.setHours(bedtimeHour, bedtimeMinute, 0, 0);
-
-    // If bedtime is after wake time, it was the previous day
-    if (bedtime >= wakeTime) {
-      bedtime.setDate(bedtime.getDate() - 1);
-    }
-
-    const sleepDuration = Math.round((wakeTime.getTime() - bedtime.getTime()) / (1000 * 60));
-
-    const newEntry: SleepEntry = {
-      id: Date.now().toString(),
-      bedtime: bedtime.getTime(),
-      wakeTime: wakeTime.getTime(),
-      sleepDuration,
-    };
-
-    const updatedSleepData = [...sleepData, newEntry];
-    setSleepData(updatedSleepData);
-    setBedtimeModalVisible(false);
-    setPendingWakeTime(null);
-
-    // Show insight if we have 7+ entries
-    if (updatedSleepData.length >= 7) {
+  // Show sleep insight when we first reach 7 entries after a save
+  useEffect(() => {
+    if (sleepData.length >= 7 && prevSleepLengthRef.current < 7) {
       setSleepInsightVisible(true);
     }
-  };
-
-  const handleSkipBedtime = () => {
-    setBedtimeModalVisible(false);
-    setPendingWakeTime(null);
-  };
+    prevSleepLengthRef.current = sleepData.length;
+  }, [sleepData.length]);
 
   const getOptimalWakeTime = (): { hour: number; minute: number; avgSleep: number } | null => {
     if (sleepData.length < 7) return null;
@@ -1293,12 +1034,12 @@ export default function App() {
               theme={theme}
               onToggleAlarm={toggleAlarm}
               onEditAlarm={handleEditAlarm}
-              onDeleteAlarm={deleteAlarm}
+              onDeleteAlarm={deleteAlarmWithHaptics}
               formatAlarmTime={formatTimeWithPeriod}
             />
           </View>
 
-          <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.accent }]} onPress={handleAddAlarm}>
+          <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.accent }]} onPress={handleAddAlarmWithDefaults}>
             <Text style={styles.addButtonText}>+</Text>
           </TouchableOpacity>
         </View>
@@ -1451,13 +1192,13 @@ export default function App() {
         onSoundChange={setSelectedSound}
         selectedDismissType={selectedDismissType}
         onDismissTypeChange={setSelectedDismissType}
-        onSave={handleSaveAlarm}
+        onSave={handleSaveAlarmWithCleanup}
         onCancel={() => {
           stopPreviewSound();
           setModalVisible(false);
           setEditingAlarmId(null);
         }}
-        onPlayPreview={playPreviewSound}
+        onPlayPreview={playPreviewSoundWithCurrentSettings}
       />
 
       {/* Alarm Dismiss Screen */}
@@ -1676,7 +1417,7 @@ export default function App() {
               hapticFeedback={settings.hapticFeedback}
             />
 
-            <TouchableOpacity style={styles.saveBedtimeButton} onPress={handleSaveBedtime}>
+            <TouchableOpacity style={styles.saveBedtimeButton} onPress={handleSaveBedtimeWithInsight}>
               <Text style={styles.saveBedtimeButtonText}>Save</Text>
             </TouchableOpacity>
 
@@ -1720,7 +1461,7 @@ export default function App() {
                   <TouchableOpacity
                     style={styles.insightButton}
                     onPress={() => {
-                      handleAddAlarm();
+                      handleAddAlarmWithDefaults();
                       setSelectedHour(insight.hour);
                       setSelectedMinute(insight.minute);
                       setSelectedLabel('Optimal Wake');
