@@ -18,7 +18,7 @@ import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerGestureEven
 import WheelPicker from 'react-native-wheel-scrollview-picker';
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
-import { Accelerometer } from 'expo-sensors';
+// Accelerometer is now handled by useAlarmDismiss hook
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,6 +50,8 @@ import { useAlarms } from './src/hooks/useAlarms';
 import { useSettings } from './src/hooks/useSettings';
 import { useAlarmSound } from './src/hooks/useAlarmSound';
 import { useSleepTracking } from './src/hooks/useSleepTracking';
+import { useAlarmTrigger } from './src/hooks/useAlarmTrigger';
+import { useAlarmDismiss } from './src/hooks/useAlarmDismiss';
 import { styles } from './src/styles';
 import {
   scheduleBedtimeNotification as scheduleBedtimeNotificationService,
@@ -145,38 +147,7 @@ const THEMES = {
   },
 };
 
-const generateMathProblem = (): MathProblem => {
-  const operations = ['+', '-', '*'];
-  const operation = operations[Math.floor(Math.random() * operations.length)];
-  let a: number, b: number, answer: number;
-
-  switch (operation) {
-    case '+':
-      a = Math.floor(Math.random() * 50) + 10;
-      b = Math.floor(Math.random() * 50) + 10;
-      answer = a + b;
-      break;
-    case '-':
-      a = Math.floor(Math.random() * 50) + 30;
-      b = Math.floor(Math.random() * 30) + 1;
-      answer = a - b;
-      break;
-    case '*':
-      a = Math.floor(Math.random() * 12) + 2;
-      b = Math.floor(Math.random() * 12) + 2;
-      answer = a * b;
-      break;
-    default:
-      a = 10;
-      b = 10;
-      answer = 20;
-  }
-
-  return {
-    question: `${a} ${operation} ${b}`,
-    answer,
-  };
-};
+// generateMathProblem is now in src/utils/mathProblem.ts, used by useAlarmDismiss hook
 
 export default function App() {
   // === HOOKS ===
@@ -240,14 +211,68 @@ export default function App() {
   // Alarm sound preview hook
   const { playPreviewSound, stopPreviewSound } = useAlarmSound();
 
+  // Track which alarm to disable after dismiss (for one-time alarms)
+  const alarmToDisableRef = useRef<string | null>(null);
+
+  // Callback when alarm is dismissed - handles app-level effects
+  const handleAlarmDismissedCallback = useCallback(() => {
+    // Show bedtime modal
+    setPendingWakeTime(new Date());
+    setBedtimeHour(22);
+    setBedtimeMinute(0);
+    setBedtimeModalVisible(true);
+
+    // Disable one-time alarm if needed
+    if (alarmToDisableRef.current) {
+      setAlarms(prev => prev.map(a =>
+        a.id === alarmToDisableRef.current ? { ...a, enabled: false } : a
+      ));
+      alarmToDisableRef.current = null;
+    }
+  }, [setAlarms]);
+
+  // Alarm trigger hook - manages alarm triggering, sound, and dismiss
+  const {
+    alarmScreenVisible,
+    activeAlarm,
+    triggerAlarm: hookTriggerAlarm,
+    stopAlarmSound,
+    dismissAlarm: hookDismissAlarm,
+    snoozeAlarm: hookSnoozeAlarm,
+  } = useAlarmTrigger(alarms, settings.hapticFeedback, handleAlarmDismissedCallback);
+
+  // Alarm dismiss hook - manages dismiss challenges (breathing, shake, math, affirmation)
+  const {
+    breathingPhase,
+    breathingCycle,
+    breathingAnim,
+    startBreathingExercise,
+    resetBreathing,
+    shakeCount,
+    shakeComplete,
+    resetShake,
+    affirmationText,
+    setAffirmationText,
+    targetAffirmation,
+    affirmationComplete,
+    checkAffirmation,
+    resetAffirmation,
+    mathProblem,
+    userAnswer,
+    setUserAnswer,
+    wrongAnswer,
+    mathComplete,
+    checkMathAnswer,
+    resetMath,
+    resetAllDismiss,
+  } = useAlarmDismiss(
+    alarmScreenVisible,
+    activeAlarm?.dismissType || 'simple',
+    settings.hapticFeedback
+  );
+
   // === LOCAL STATE ===
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [alarmScreenVisible, setAlarmScreenVisible] = useState(false);
-  const [activeAlarm, setActiveAlarm] = useState<Alarm | null>(null);
-  const [mathProblem, setMathProblem] = useState<MathProblem>(generateMathProblem());
-  const [userAnswer, setUserAnswer] = useState('');
-  const [wrongAnswer, setWrongAnswer] = useState(false);
-  const [mathComplete, setMathComplete] = useState(false);
 
 // Initialize native alarm system
   useEffect(() => {
@@ -265,33 +290,9 @@ export default function App() {
     return () => sub.remove();
   }, []);
 
-  // Breathing exercise state
-  const [breathingPhase, setBreathingPhase] = useState<'inhale' | 'hold' | 'exhale' | 'complete'>('inhale');
-  const [breathingCycle, setBreathingCycle] = useState(0);
-  const breathingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const breathingAnim = useRef(new Animated.Value(0.4)).current;
-
-  // Affirmation state
-  const [affirmationText, setAffirmationText] = useState('');
-  const [targetAffirmation, setTargetAffirmation] = useState(AFFIRMATIONS[0]);
-  const [affirmationComplete, setAffirmationComplete] = useState(false);
-
-  // New alarm state - now from useAlarms hook
-
-  // Shake detection state
-  const [shakeCount, setShakeCount] = useState(0);
-  const [shakeComplete, setShakeComplete] = useState(false);
-  const lastShakeTime = useRef<number>(0);
-
-  // Undo delete state - now from useAlarms hook
-
-  // Sleep tracking state - now from useSleepTracking hook
-  // Keep sleepInsightVisible locally (UI state, not data state)
+  // Sleep insight modal state
   const [sleepInsightVisible, setSleepInsightVisible] = useState(false);
 
-  // Audio
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const lastTriggeredRef = useRef<string>('');
   // Combined loading state from hooks
   const isLoaded = alarmsLoaded && !settingsLoading && !sleepLoading;
 
@@ -340,230 +341,76 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Check for alarm triggers
-  useEffect(() => {
-    const now = currentTime;
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentDay = now.getDay();
-    const timeKey = `${currentHour}:${currentMinute}`;
+  // Alarm checking is now handled by useAlarmTrigger hook
 
-    alarms.forEach((alarm) => {
-      if (!alarm.enabled) return;
-      if (alarm.hour !== currentHour || alarm.minute !== currentMinute) return;
-
-      // Check if alarm should trigger today
-      const shouldTrigger = alarm.days.every((d) => !d) || alarm.days[currentDay];
-      if (!shouldTrigger) return;
-
-      // Prevent multiple triggers in the same minute
-      const alarmKey = `${alarm.id}-${timeKey}`;
-      if (lastTriggeredRef.current === alarmKey) return;
-      lastTriggeredRef.current = alarmKey;
-
-      triggerAlarm(alarm);
-    });
-  }, [currentTime, alarms]);
-
-  // Shake detection for alarm dismissal
-  useEffect(() => {
-    if (!alarmScreenVisible || !activeAlarm || activeAlarm.dismissType !== 'shake') {
-      return;
-    }
-
-    const subscription = Accelerometer.addListener(({ x, y, z }) => {
-      const totalForce = Math.sqrt(x * x + y * y + z * z);
-      const now = Date.now();
-
-      if (totalForce > SHAKE_THRESHOLD && now - lastShakeTime.current > 300) {
-        lastShakeTime.current = now;
-        setShakeCount((prev) => {
-          if (prev >= REQUIRED_SHAKES) return prev;
-          const newCount = prev + 1;
-          if (newCount === REQUIRED_SHAKES) {
-            handleShakeDismiss();
-          }
-          return newCount;
-        });
-      }
-    });
-
-    Accelerometer.setUpdateInterval(100);
-
-    return () => {
-      subscription.remove();
-    };
-  }, [alarmScreenVisible, activeAlarm]);
-
-  const handleShakeDismiss = async () => {
-    await stopAlarmSound();
-    setShakeComplete(true);
-    setTimeout(() => {
-      setShakeComplete(false);
-      setAlarmScreenVisible(false);
-      setShakeCount(0);
-      setPendingWakeTime(new Date());
-      setBedtimeHour(22);
-      setBedtimeMinute(0);
-      setBedtimeModalVisible(true);
-      if (activeAlarm && activeAlarm.days.every((d) => !d)) {
-        setAlarms(alarms.map((a) =>
-          a.id === activeAlarm.id ? { ...a, enabled: false } : a
-        ));
-      }
-      setActiveAlarm(null);
-    }, 2000);
-  };
-
-  const handleSimpleDismiss = async () => {
-    await stopAlarmSound();
-    setAlarmScreenVisible(false);
-
-    // Store wake time and show bedtime prompt
-    setPendingWakeTime(new Date());
-    setBedtimeHour(22);
-    setBedtimeMinute(0);
-    setBedtimeModalVisible(true);
-
-    // Disable one-time alarms
+  // Unified dismiss handler - marks one-time alarms for disabling and calls hook dismiss
+  const handleUnifiedDismiss = useCallback(() => {
     if (activeAlarm && activeAlarm.days.every((d) => !d)) {
-      setAlarms(alarms.map((a) =>
-        a.id === activeAlarm.id ? { ...a, enabled: false } : a
-      ));
+      alarmToDisableRef.current = activeAlarm.id;
     }
-    setActiveAlarm(null);
-  };
+    resetAllDismiss();
+    hookDismissAlarm();
+  }, [activeAlarm, resetAllDismiss, hookDismissAlarm]);
 
-  const animateBreathingCircle = (toValue: number, duration: number) => {
-    Animated.timing(breathingAnim, {
-      toValue,
-      duration,
-      useNativeDriver: false,
-    }).start();
-  };
+  // Handle simple dismiss (button press)
+  const handleSimpleDismiss = useCallback(() => {
+    handleUnifiedDismiss();
+  }, [handleUnifiedDismiss]);
 
-  const startBreathingExercise = () => {
-    setBreathingPhase('inhale');
-    setBreathingCycle(0);
-    breathingAnim.setValue(0.4);
-    let cycle = 0;
-    let phase: 'inhale' | 'hold' | 'exhale' | 'complete' = 'inhale';
+  // Handle snooze
+  const handleSnoozeAlarm = useCallback(() => {
+    resetAllDismiss();
+    hookSnoozeAlarm();
+  }, [resetAllDismiss, hookSnoozeAlarm]);
 
-    // Start first inhale animation
-    animateBreathingCircle(1.0, 4000);
-
-    const runPhase = () => {
-      if (phase === 'inhale') {
-        // Inhale done -> Hold (7 seconds, circle stays expanded)
-        phase = 'hold';
-        setBreathingPhase('hold');
-        breathingTimerRef.current = setTimeout(runPhase, 7000);
-      } else if (phase === 'hold') {
-        // Hold done -> Exhale (8 seconds, circle contracts)
-        phase = 'exhale';
-        setBreathingPhase('exhale');
-        animateBreathingCircle(0.4, 8000);
-        breathingTimerRef.current = setTimeout(runPhase, 8000);
-      } else if (phase === 'exhale') {
-        // Exhale done -> next cycle or complete
-        cycle++;
-        setBreathingCycle(cycle);
-        if (cycle >= BREATHING_CYCLES_REQUIRED) {
-          phase = 'complete';
-          setBreathingPhase('complete');
-          // Auto-dismiss after showing "Good morning" for 2 seconds
-          breathingTimerRef.current = setTimeout(() => {
-            handleBreathingDismiss();
-          }, 2500);
-        } else {
-          // Start next inhale (4 seconds, circle expands)
-          phase = 'inhale';
-          setBreathingPhase('inhale');
-          animateBreathingCircle(1.0, 4000);
-          breathingTimerRef.current = setTimeout(runPhase, 4000);
-        }
-      }
-    };
-
-    // First inhale: 4 seconds
-    breathingTimerRef.current = setTimeout(runPhase, 4000);
-  };
-
-  const handleBreathingDismiss = async () => {
-    if (breathingTimerRef.current) {
-      clearTimeout(breathingTimerRef.current);
-      breathingTimerRef.current = null;
-    }
-    await stopAlarmSound();
-    setAlarmScreenVisible(false);
-    setPendingWakeTime(new Date());
-    setBedtimeHour(22);
-    setBedtimeMinute(0);
-    setBedtimeModalVisible(true);
-    if (activeAlarm && activeAlarm.days.every((d) => !d)) {
-      setAlarms(alarms.map((a) =>
-        a.id === activeAlarm.id ? { ...a, enabled: false } : a
-      ));
-    }
-    setActiveAlarm(null);
-  };
-
-  // Cleanup breathing timer when alarm screen is hidden or component unmounts
+  // Watch for shake completion
   useEffect(() => {
-    if (!alarmScreenVisible && breathingTimerRef.current) {
-      clearTimeout(breathingTimerRef.current);
-      breathingTimerRef.current = null;
-    }
-    return () => {
-      if (breathingTimerRef.current) {
-        clearTimeout(breathingTimerRef.current);
-        breathingTimerRef.current = null;
-      }
-    };
-  }, [alarmScreenVisible]);
-
-  const handleAffirmationChange = async (text: string) => {
-    setAffirmationText(text);
-    if (text.toLowerCase().trim() === targetAffirmation.toLowerCase()) {
-      await stopAlarmSound();
-      setAffirmationComplete(true);
+    if (shakeComplete) {
       setTimeout(() => {
-        setAffirmationComplete(false);
-        setAlarmScreenVisible(false);
-        setAffirmationText('');
-        setPendingWakeTime(new Date());
-        setBedtimeHour(22);
-        setBedtimeMinute(0);
-        setBedtimeModalVisible(true);
-        if (activeAlarm && activeAlarm.days.every((d) => !d)) {
-          setAlarms(alarms.map((a) =>
-            a.id === activeAlarm.id ? { ...a, enabled: false } : a
-          ));
-        }
-        setActiveAlarm(null);
+        handleUnifiedDismiss();
       }, 2000);
     }
-  };
+  }, [shakeComplete, handleUnifiedDismiss]);
 
-  const triggerAlarm = async (alarm: Alarm) => {
-    setActiveAlarm(alarm);
-    setMathProblem(generateMathProblem());
-    setUserAnswer('');
-    setAffirmationText('');
-    setAffirmationComplete(false);
-    setTargetAffirmation(AFFIRMATIONS[Math.floor(Math.random() * AFFIRMATIONS.length)]);
-    setWrongAnswer(false);
-    setMathComplete(false);
-    setShakeCount(0);
-    setShakeComplete(false);
-    setAlarmScreenVisible(true);
+  // Watch for breathing completion
+  useEffect(() => {
+    if (breathingPhase === 'complete') {
+      setTimeout(() => {
+        handleUnifiedDismiss();
+      }, 2500);
+    }
+  }, [breathingPhase, handleUnifiedDismiss]);
 
-    if (alarm.dismissType === 'breathing') {
+  // Watch for affirmation completion
+  useEffect(() => {
+    if (affirmationComplete) {
+      setTimeout(() => {
+        handleUnifiedDismiss();
+      }, 2000);
+    }
+  }, [affirmationComplete, handleUnifiedDismiss]);
+
+  // Watch for math completion
+  useEffect(() => {
+    if (mathComplete) {
+      setTimeout(() => {
+        handleUnifiedDismiss();
+      }, 2000);
+    }
+  }, [mathComplete, handleUnifiedDismiss]);
+
+  // Start breathing exercise when alarm triggers with breathing dismiss type
+  useEffect(() => {
+    if (alarmScreenVisible && activeAlarm?.dismissType === 'breathing') {
       startBreathingExercise();
     }
+  }, [alarmScreenVisible, activeAlarm, startBreathingExercise]);
 
-    await playAlarmSound(alarm.wakeIntensity, alarm.sound);
-  };
+  // Trigger alarm with dismiss state reset
+  const triggerAlarmWithReset = useCallback((alarm: Alarm) => {
+    resetAllDismiss();
+    hookTriggerAlarm(alarm);
+  }, [resetAllDismiss, hookTriggerAlarm]);
 
   // Handle notification received (triggers alarm when notification fires)
   useEffect(() => {
@@ -575,7 +422,7 @@ export default function App() {
       if (data?.alarmId) {
         const alarm = alarms.find((a) => a.id === data.alarmId);
         if (alarm && alarm.enabled) {
-          triggerAlarm(alarm);
+          triggerAlarmWithReset(alarm);
         }
       }
     });
@@ -586,7 +433,7 @@ export default function App() {
       if (data?.alarmId) {
         const alarm = alarms.find((a) => a.id === data.alarmId);
         if (alarm && alarm.enabled) {
-          triggerAlarm(alarm);
+          triggerAlarmWithReset(alarm);
         }
       }
     });
@@ -595,148 +442,22 @@ export default function App() {
       notificationReceivedSubscription.remove();
       notificationResponseSubscription.remove();
     };
-  }, [alarms]);
+  }, [alarms, triggerAlarmWithReset]);
 
-  // Sound configurations for different alarm tones
-  const SOUND_CONFIGS: Record<AlarmSound, { rate: number; pattern: number[] | null }> = {
-    sunrise: { rate: 1.0, pattern: null }, // Normal, continuous
-    ocean: { rate: 0.75, pattern: [3000, 1500] }, // Slow, wave-like with pauses
-    forest: { rate: 1.2, pattern: [500, 200, 500, 200, 500, 1500] }, // Higher pitch, bird-like rhythm
-    chimes: { rate: 1.1, pattern: [400, 600, 400, 600, 400, 1200] }, // Quick chime pattern
-    piano: { rate: 0.85, pattern: [2000, 800] }, // Slower, melodic
-    birds: { rate: 1.4, pattern: [300, 150, 300, 150, 300, 150, 300, 1000] }, // High pitch, chirpy
-  };
-
-  const patternIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const patternIndexRef = useRef<number>(0);
-
-  const playAlarmSound = async (wakeIntensity: WakeIntensity, soundType: AlarmSound = 'sunrise') => {
-    try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-      });
-
-      const config = SOUND_CONFIGS[soundType];
-      const intensityOption = WAKE_INTENSITY_OPTIONS.find(o => o.value === wakeIntensity);
-      const initialVolume = intensityOption ? intensityOption.volume : 0.5;
-
-      const { sound } = await Audio.Sound.createAsync(
-        require('./assets/alarm-sound.mp3'),
-        {
-          isLooping: true,
-          volume: initialVolume,
-          rate: config.rate,
-          shouldCorrectPitch: false, // Changing rate also changes pitch for distinct sounds
-        }
-      );
-
-      soundRef.current = sound;
-      await sound.playAsync();
-
-      // Apply pattern if defined (creates rhythmic on/off effect)
-      if (config.pattern) {
-        patternIndexRef.current = 0;
-        let isPlaying = true;
-
-        const runPattern = async () => {
-          if (!soundRef.current) return;
-
-          const pattern = config.pattern!;
-          const duration = pattern[patternIndexRef.current % pattern.length];
-
-          if (isPlaying) {
-            await soundRef.current.setVolumeAsync(initialVolume);
-          } else {
-            await soundRef.current.setVolumeAsync(0.05); // Very quiet instead of silent for smoother effect
-          }
-
-          isPlaying = !isPlaying;
-          patternIndexRef.current++;
-
-          patternIntervalRef.current = setTimeout(runPattern, duration);
-        };
-
-        patternIntervalRef.current = setTimeout(runPattern, config.pattern[0]);
-      }
-
-    } catch (error) {
-      console.log('Error playing sound:', error);
+  // Handle math dismiss - validates answer and triggers dismiss on correct
+  const handleMathDismiss = useCallback(() => {
+    const isCorrect = checkMathAnswer(userAnswer);
+    if (isCorrect) {
+      // mathComplete will trigger the dismiss via useEffect
     }
-  };
+    setUserAnswer('');
+  }, [checkMathAnswer, userAnswer, setUserAnswer]);
 
-  const stopAlarmSound = async () => {
-    if (patternIntervalRef.current) {
-      clearTimeout(patternIntervalRef.current);
-      patternIntervalRef.current = null;
-    }
-    if (soundRef.current) {
-      await soundRef.current.stopAsync();
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
-    }
-  };
-
-  // Sound preview is now handled by useAlarmSound hook
-
-  const handleDismissAlarm = async () => {
-    // Validate numeric input
-    const trimmed = userAnswer.trim();
-    if (trimmed === '' || !/^-?\d+$/.test(trimmed)) {
-      // Invalid input - not a number
-      setWrongAnswer(true);
-      setUserAnswer('');
-      setTimeout(() => setWrongAnswer(false), 500);
-      return;
-    }
-    const answer = parseInt(trimmed, 10);
-    if (answer === mathProblem.answer) {
-      await stopAlarmSound();
-      setMathComplete(true);
-      setTimeout(() => {
-        setMathComplete(false);
-        setAlarmScreenVisible(false);
-        setUserAnswer('');
-        setPendingWakeTime(new Date());
-        setBedtimeHour(22);
-        setBedtimeMinute(0);
-        setBedtimeModalVisible(true);
-        if (activeAlarm && activeAlarm.days.every((d) => !d)) {
-          setAlarms(alarms.map((a) =>
-            a.id === activeAlarm.id ? { ...a, enabled: false } : a
-          ));
-        }
-        setActiveAlarm(null);
-      }, 2000);
-    } else {
-      setWrongAnswer(true);
-      setUserAnswer('');
-      setTimeout(() => {
-        setWrongAnswer(false);
-        setMathProblem(generateMathProblem());
-      }, 500);
-    }
-  };
-
-  const handleSnoozeAlarm = async () => {
-    if (!activeAlarm || activeAlarm.snooze === 0) return;
-
-    if (breathingTimerRef.current) {
-      clearTimeout(breathingTimerRef.current);
-      breathingTimerRef.current = null;
-    }
-    await stopAlarmSound();
-    setAlarmScreenVisible(false);
-
-    // Schedule snooze
-    setTimeout(() => {
-      if (activeAlarm) {
-        triggerAlarm(activeAlarm);
-      }
-    }, activeAlarm.snooze * 60 * 1000);
-
-    setActiveAlarm(null);
-  };
+  // Handle affirmation text change
+  const handleAffirmationChange = useCallback((text: string) => {
+    setAffirmationText(text);
+    checkAffirmation(text);
+  }, [setAffirmationText, checkAffirmation]);
 
   // Wrapper functions that pass app-specific context to hook functions
   const handleAddAlarmWithDefaults = () => {
@@ -1150,7 +871,7 @@ export default function App() {
                 />
                 <TouchableOpacity
                   style={styles.mathSubmitButton}
-                  onPress={handleDismissAlarm}
+                  onPress={handleMathDismiss}
                 >
                   <Text style={styles.mathSubmitButtonText}>Submit</Text>
                 </TouchableOpacity>
