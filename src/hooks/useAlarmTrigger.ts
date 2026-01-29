@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { WAKE_INTENSITY_OPTIONS } from '../constants/options';
+import { nativeAlarm } from '../services/nativeAlarm';
 import type { Alarm, AlarmSound, WakeIntensity } from '../types';
 
 const SOUND_CONFIGS: Record<AlarmSound, { rate: number; pattern: number[] | null }> = {
@@ -169,6 +170,12 @@ export function useAlarmTrigger(
       await soundRef.current.stopAsync();
       await soundRef.current.unloadAsync();
       soundRef.current = null;
+    }
+    // Stop the native Android alarm service (MediaPlayer + vibration)
+    try {
+      await nativeAlarm.stopAlarm();
+    } catch (e) {
+      // May fail if no native alarm is active - that's fine
     }
   }, []);
 
