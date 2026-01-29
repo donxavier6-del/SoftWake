@@ -42,6 +42,7 @@ import {
   formatTimeDisplay,
 } from './src/utils/timeFormatting';
 import { InsightsChart } from './src/components/InsightsChart';
+import { SettingsPanel } from './src/components/SettingsPanel';
 
 // Check if running in Expo Go (where push notifications are not supported in SDK 53+)
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -1064,7 +1065,16 @@ export default function App() {
   };
 
   const handleDismissAlarm = async () => {
-    const answer = parseInt(userAnswer, 10);
+    // Validate numeric input
+    const trimmed = userAnswer.trim();
+    if (trimmed === '' || !/^-?\d+$/.test(trimmed)) {
+      // Invalid input - not a number
+      setWrongAnswer(true);
+      setUserAnswer('');
+      setTimeout(() => setWrongAnswer(false), 500);
+      return;
+    }
+    const answer = parseInt(trimmed, 10);
     if (answer === mathProblem.answer) {
       await stopAlarmSound();
       setMathComplete(true);
@@ -1618,189 +1628,14 @@ export default function App() {
       )}
 
       {activeTab === 'settings' && (
-        <ScrollView style={styles.settingsTabContent} showsVerticalScrollIndicator={false}>
-          {/* Alarm Defaults */}
-          <Text style={[styles.settingsSectionHeader, { color: theme.textMuted }]}>Alarm Defaults</Text>
-          <View style={[styles.settingsCard, { backgroundColor: theme.card }]}>
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => {
-                const currentIndex = WAKE_INTENSITY_OPTIONS.findIndex((o) => o.value === settings.defaultWakeIntensity);
-                const nextIndex = (currentIndex + 1) % WAKE_INTENSITY_OPTIONS.length;
-                updateSettings({ defaultWakeIntensity: WAKE_INTENSITY_OPTIONS[nextIndex].value });
-              }}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Wake Intensity</Text>
-              <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>
-                {WAKE_INTENSITY_OPTIONS.find((o) => o.value === settings.defaultWakeIntensity)?.label}
-              </Text>
-            </TouchableOpacity>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => {
-                const currentIndex = SOUND_OPTIONS.findIndex((o) => o.value === settings.defaultSound);
-                const nextIndex = (currentIndex + 1) % SOUND_OPTIONS.length;
-                updateSettings({ defaultSound: SOUND_OPTIONS[nextIndex].value });
-              }}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Sound</Text>
-              <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>
-                {SOUND_OPTIONS.find((o) => o.value === settings.defaultSound)?.label}
-              </Text>
-            </TouchableOpacity>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => {
-                const currentIndex = DISMISS_OPTIONS.findIndex((o) => o.value === settings.defaultDismissType);
-                const nextIndex = (currentIndex + 1) % DISMISS_OPTIONS.length;
-                updateSettings({ defaultDismissType: DISMISS_OPTIONS[nextIndex].value });
-              }}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Dismiss Method</Text>
-              <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>
-                {DISMISS_OPTIONS.find((o) => o.value === settings.defaultDismissType)?.label}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Sleep */}
-          <Text style={[styles.settingsSectionHeader, { color: theme.textMuted }]}>Sleep</Text>
-          <View style={[styles.settingsCard, { backgroundColor: theme.card }]}>
-            <View style={styles.settingsItemRow}>
-              <View style={styles.settingsItemLabelContainer}>
-                <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Bedtime Reminder</Text>
-                {settings.bedtimeReminderEnabled && (
-                  <Text style={[styles.settingsItemSubtext, { color: theme.textMuted }]}>
-                    Reminder at {formatTimeWithPeriod(
-                      settings.bedtimeMinute < 30
-                        ? (settings.bedtimeHour === 0 ? 23 : settings.bedtimeHour - 1)
-                        : settings.bedtimeHour,
-                      settings.bedtimeMinute < 30
-                        ? settings.bedtimeMinute + 30
-                        : settings.bedtimeMinute - 30
-                    )}
-                  </Text>
-                )}
-              </View>
-              <Switch
-                value={settings.bedtimeReminderEnabled}
-                onValueChange={(val) => {
-                  updateSettings({ bedtimeReminderEnabled: val });
-                  if (val) setBedtimePickerVisible(true);
-                }}
-                trackColor={{ false: theme.switchTrackOff, true: theme.accent }}
-                thumbColor={settings.bedtimeReminderEnabled ? '#FFFFFF' : theme.switchThumbOff}
-              />
-            </View>
-            {settings.bedtimeReminderEnabled && bedtimePickerVisible && (
-              <>
-                <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-                <View style={styles.settingsBedtimePicker}>
-                  <Text style={[styles.settingsPickerLabel, { color: theme.text }]}>Target Bedtime</Text>
-                  <TimePicker
-                    hour={settings.bedtimeHour}
-                    minute={settings.bedtimeMinute}
-                    onHourChange={(h) => updateSettings({ bedtimeHour: h })}
-                    onMinuteChange={(m) => updateSettings({ bedtimeMinute: m })}
-                    hapticFeedback={settings.hapticFeedback}
-                    minuteStep={5}
-                  />
-                </View>
-              </>
-            )}
-            {settings.bedtimeReminderEnabled && !bedtimePickerVisible && (
-              <>
-                <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-                <TouchableOpacity
-                  style={styles.settingsItem}
-                  onPress={() => setBedtimePickerVisible(true)}
-                >
-                  <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Target Bedtime</Text>
-                  <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>
-                    {formatTimeWithPeriod(settings.bedtimeHour, settings.bedtimeMinute)}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => {
-                const currentIndex = SLEEP_GOAL_OPTIONS.indexOf(settings.sleepGoalHours);
-                const nextIndex = (currentIndex + 1) % SLEEP_GOAL_OPTIONS.length;
-                updateSettings({ sleepGoalHours: SLEEP_GOAL_OPTIONS[nextIndex] });
-              }}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Sleep Goal</Text>
-              <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>
-                {settings.sleepGoalHours % 1 === 0
-                  ? `${settings.sleepGoalHours} hours`
-                  : `${Math.floor(settings.sleepGoalHours)}h ${(settings.sleepGoalHours % 1) * 60}m`}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* App */}
-          <Text style={[styles.settingsSectionHeader, { color: theme.textMuted }]}>App</Text>
-          <View style={[styles.settingsCard, { backgroundColor: theme.card }]}>
-            <View style={styles.settingsItemRow}>
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Dark Mode</Text>
-              <Switch
-                value={settings.darkMode}
-                onValueChange={(val) => updateSettings({ darkMode: val })}
-                trackColor={{ false: theme.switchTrackOff, true: theme.accent }}
-                thumbColor={settings.darkMode ? '#FFFFFF' : theme.switchThumbOff}
-              />
-            </View>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <View style={styles.settingsItemRow}>
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Haptic Feedback</Text>
-              <Switch
-                value={settings.hapticFeedback}
-                onValueChange={(val) => updateSettings({ hapticFeedback: val })}
-                trackColor={{ false: theme.switchTrackOff, true: theme.accent }}
-                thumbColor={settings.hapticFeedback ? '#FFFFFF' : theme.switchThumbOff}
-              />
-            </View>
-          </View>
-
-          {/* About */}
-          <Text style={[styles.settingsSectionHeader, { color: theme.textMuted }]}>About</Text>
-          <View style={[styles.settingsCard, { backgroundColor: theme.card }]}>
-            <View style={styles.settingsItem}>
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Version</Text>
-              <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>1.0.0</Text>
-            </View>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => Alert.alert('Rate SoftWake', 'This will open the app store. (Coming soon)')}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Rate SoftWake</Text>
-              <Text style={[styles.settingsItemChevron, { color: theme.textMuted }]}>›</Text>
-            </TouchableOpacity>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => Alert.alert('Send Feedback', 'Feedback form coming soon.')}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Send Feedback</Text>
-              <Text style={[styles.settingsItemChevron, { color: theme.textMuted }]}>›</Text>
-            </TouchableOpacity>
-            <View style={[styles.settingsDivider, { backgroundColor: theme.surface }]} />
-            <TouchableOpacity
-              style={styles.settingsItem}
-              onPress={() => Alert.alert('Privacy Policy', 'Privacy policy page coming soon.')}
-            >
-              <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Privacy Policy</Text>
-              <Text style={[styles.settingsItemChevron, { color: theme.textMuted }]}>›</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.settingsFooter} />
-        </ScrollView>
+        <SettingsPanel
+          settings={settings}
+          theme={theme}
+          updateSettings={updateSettings}
+          bedtimePickerVisible={bedtimePickerVisible}
+          setBedtimePickerVisible={setBedtimePickerVisible}
+          TimePicker={TimePicker}
+        />
       )}
 
       {/* Undo Toast */}
