@@ -21,15 +21,7 @@ import {
   DISMISS_OPTIONS,
 } from '../constants/options';
 import type { Theme, Settings, WakeIntensity, AlarmSound, DismissType } from '../types';
-
-// TimePicker props interface
-interface TimePickerProps {
-  hour: number;
-  minute: number;
-  onHourChange: (hour: number) => void;
-  onMinuteChange: (minute: number) => void;
-  hapticFeedback?: boolean;
-}
+import { TimePicker } from './TimePicker';
 
 interface AlarmEditorProps {
   visible: boolean;
@@ -60,8 +52,6 @@ interface AlarmEditorProps {
   onSave: () => void;
   onCancel: () => void;
   onPlayPreview: () => void;
-  // TimePicker component
-  TimePicker: React.ComponentType<TimePickerProps>;
 }
 
 export function AlarmEditor({
@@ -88,7 +78,6 @@ export function AlarmEditor({
   onSave,
   onCancel,
   onPlayPreview,
-  TimePicker,
 }: AlarmEditorProps) {
   return (
     <Modal
