@@ -34,6 +34,12 @@ import {
   AFFIRMATIONS,
   SLEEP_GOAL_OPTIONS,
 } from './src/constants/options';
+import {
+  formatTimeHHMM,
+  formatTimeWithPeriod,
+  formatTimeObject,
+  formatTimeDisplay,
+} from './src/utils/timeFormatting';
 
 // Check if running in Expo Go (where push notifications are not supported in SDK 53+)
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -636,12 +642,6 @@ export default function App() {
     for (const alarm of alarmsToSchedule) {
       if (!alarm.enabled) continue;
 
-      const formatTime = (h: number, m: number) => {
-        const displayHour = h % 12 || 12;
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        return `${displayHour}:${m.toString().padStart(2, '0')} ${ampm}`;
-      };
-
       const hasRepeatingDays = alarm.days.some((d) => d);
 
       if (hasRepeatingDays) {
@@ -656,7 +656,7 @@ export default function App() {
             identifier: `${ALARM_NOTIFICATION_PREFIX}${alarm.id}-${dayIndex}`,
             content: {
               title: alarm.label || 'SoftWake Alarm',
-              body: `Alarm for ${formatTime(alarm.hour, alarm.minute)}`,
+              body: `Alarm for ${formatTimeWithPeriod(alarm.hour, alarm.minute)}`,
               sound: true,
               data: { alarmId: alarm.id },
               ...(Platform.OS === 'android' && { channelId: 'alarms' }),
@@ -684,7 +684,7 @@ export default function App() {
           identifier: `${ALARM_NOTIFICATION_PREFIX}${alarm.id}-once`,
           content: {
             title: alarm.label || 'SoftWake Alarm',
-            body: `Alarm for ${formatTime(alarm.hour, alarm.minute)}`,
+            body: `Alarm for ${formatTimeWithPeriod(alarm.hour, alarm.minute)}`,
             sound: true,
             data: { alarmId: alarm.id },
             ...(Platform.OS === 'android' && { channelId: 'alarms' }),
@@ -1119,24 +1119,7 @@ export default function App() {
     setActiveAlarm(null);
   };
 
-  const formatTime = (date: Date) => {
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const displayHours = hours % 12 || 12;
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    return {
-      time: `${displayHours}:${minutes.toString().padStart(2, '0')}`,
-      ampm,
-    };
-  };
-
-  const formatAlarmTime = (hour: number, minute: number) => {
-    const displayHour = hour % 12 || 12;
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    return `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
-  };
-
-  const { time, ampm } = formatTime(currentTime);
+  const { time, ampm } = formatTimeObject(currentTime);
 
   const getNextAlarmCountdown = (): { hours: number; minutes: number } | null => {
     const enabledAlarms = alarms.filter(a => a.enabled);
@@ -1323,12 +1306,6 @@ export default function App() {
     setSettings((prev) => ({ ...prev, ...partial }));
   };
 
-  const formatSettingsTime = (hour: number, minute: number) => {
-    const displayHour = hour % 12 || 12;
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    return `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
-  };
-
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -1415,8 +1392,8 @@ export default function App() {
         date: new Date(worst.wakeTime),
       },
       totalNights: sleepData.length,
-      avgBedtime: formatSettingsTime(avgBedtimeHour, avgBedtimeMinute),
-      avgWakeTime: formatSettingsTime(avgWakeHour, avgWakeMinute),
+      avgBedtime: formatTimeWithPeriod(avgBedtimeHour, avgBedtimeMinute),
+      avgWakeTime: formatTimeWithPeriod(avgWakeHour, avgWakeMinute),
     };
   };
 
@@ -1566,7 +1543,7 @@ export default function App() {
                           { color: theme.text },
                           !alarm.enabled && { color: theme.textDisabled },
                         ]}>
-                          {formatAlarmTime(alarm.hour, alarm.minute)}
+                          {formatTimeWithPeriod(alarm.hour, alarm.minute)}
                         </Text>
                         <Text style={[
                           styles.alarmDays,
@@ -1745,7 +1722,7 @@ export default function App() {
                 <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Bedtime Reminder</Text>
                 {settings.bedtimeReminderEnabled && (
                   <Text style={[styles.settingsItemSubtext, { color: theme.textMuted }]}>
-                    Reminder at {formatSettingsTime(
+                    Reminder at {formatTimeWithPeriod(
                       settings.bedtimeMinute < 30
                         ? (settings.bedtimeHour === 0 ? 23 : settings.bedtimeHour - 1)
                         : settings.bedtimeHour,
@@ -1791,7 +1768,7 @@ export default function App() {
                 >
                   <Text style={[styles.settingsItemLabel, { color: theme.text }]}>Target Bedtime</Text>
                   <Text style={[styles.settingsItemValue, { color: theme.textMuted }]}>
-                    {formatSettingsTime(settings.bedtimeHour, settings.bedtimeMinute)}
+                    {formatTimeWithPeriod(settings.bedtimeHour, settings.bedtimeMinute)}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -2194,7 +2171,7 @@ export default function App() {
             ) : (
               <View style={styles.breathingContent}>
                 <Text style={styles.breathingTimeText}>
-                  {activeAlarm ? formatAlarmTime(activeAlarm.hour, activeAlarm.minute) : ''}
+                  {activeAlarm ? formatTimeWithPeriod(activeAlarm.hour, activeAlarm.minute) : ''}
                 </Text>
                 <View style={styles.breathingCircleContainer}>
                   <Animated.View
@@ -2340,7 +2317,7 @@ export default function App() {
         ) : (
         <View style={styles.alarmScreen}>
           <Text style={styles.alarmScreenTime}>
-            {activeAlarm ? formatAlarmTime(activeAlarm.hour, activeAlarm.minute) : ''}
+            {activeAlarm ? formatTimeWithPeriod(activeAlarm.hour, activeAlarm.minute) : ''}
           </Text>
           {activeAlarm?.label ? (
             <Text style={styles.alarmScreenLabel}>{activeAlarm.label}</Text>
@@ -2427,7 +2404,7 @@ export default function App() {
                     For optimal rest (8 hours), try waking up at:
                   </Text>
                   <Text style={styles.insightTime}>
-                    {formatAlarmTime(insight.hour, insight.minute)}
+                    {formatTimeWithPeriod(insight.hour, insight.minute)}
                   </Text>
                   <TouchableOpacity
                     style={styles.insightButton}
