@@ -166,16 +166,24 @@ export function useAlarmTrigger(
       clearTimeout(patternIntervalRef.current);
       patternIntervalRef.current = null;
     }
-    if (soundRef.current) {
-      await soundRef.current.stopAsync();
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
-    }
-    // Stop the native Android alarm service (MediaPlayer + vibration)
+
+    // Stop the native Android alarm service first (MediaPlayer + vibration).
+    // This must run regardless of whether the JS sound cleanup succeeds,
+    // since the native foreground service is an independent sound source.
     try {
       await nativeAlarm.stopAlarm();
     } catch (e) {
       // May fail if no native alarm is active - that's fine
+    }
+
+    if (soundRef.current) {
+      try {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+      } catch (e) {
+        // Sound may already be stopped/unloaded
+      }
+      soundRef.current = null;
     }
   }, []);
 
