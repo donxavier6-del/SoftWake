@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { WAKE_INTENSITY_OPTIONS } from '../constants/options';
@@ -195,7 +196,11 @@ export function useAlarmTrigger(
     setActiveAlarm(alarm);
     setAlarmScreenVisible(true);
 
-    await playAlarmSound(alarm.wakeIntensity, alarm.sound);
+    // On Android, the native AlarmService already handles audio playback
+    // via MediaPlayer. Only use expo-av on iOS where there's no native service.
+    if (Platform.OS !== 'android') {
+      await playAlarmSound(alarm.wakeIntensity, alarm.sound);
+    }
   }, [hapticFeedback, playAlarmSound]);
 
   const dismissAlarm = useCallback(async () => {
