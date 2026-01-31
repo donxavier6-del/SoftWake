@@ -25,6 +25,7 @@
     <meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
+    <service android:name=".alarm.AlarmService" android:foregroundServiceType="mediaPlayback" android:exported="false"/>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
@@ -37,16 +38,8 @@
         <data android:scheme="exp+softwake"/>
       </intent-filter>
     </activity>
-    <service
-        android:name=".alarm.AlarmService"
-        android:foregroundServiceType="mediaPlayback"
-        android:exported="false"/>
-    <receiver
-        android:name=".alarm.AlarmReceiver"
-        android:exported="false"/>
-    <receiver
-        android:name=".alarm.BootReceiver"
-        android:exported="true">
+    <receiver android:name=".alarm.AlarmReceiver" android:exported="false"/>
+    <receiver android:name=".alarm.BootReceiver" android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.BOOT_COMPLETED"/>
       </intent-filter>

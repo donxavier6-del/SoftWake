@@ -129,7 +129,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun getLaunchAlarmId(promise: Promise) {
         try {
-            val activity = currentActivity
+            val activity = reactApplicationContext.currentActivity
             val alarmId = activity?.intent?.getStringExtra("alarmId")
             // Clear so we don't re-trigger on subsequent calls
             activity?.intent?.removeExtra("alarmId")
