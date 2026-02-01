@@ -48,6 +48,9 @@ export function SettingsPanel({
             const nextIndex = (currentIndex + 1) % WAKE_INTENSITY_OPTIONS.length;
             updateSettings({ defaultWakeIntensity: WAKE_INTENSITY_OPTIONS[nextIndex].value });
           }}
+          accessibilityLabel={`Default wake intensity, ${WAKE_INTENSITY_OPTIONS.find((o) => o.value === settings.defaultWakeIntensity)?.label}`}
+          accessibilityRole="button"
+          accessibilityHint="Tap to cycle through options"
         >
           <Text style={[styles.itemLabel, { color: theme.text }]}>Wake Intensity</Text>
           <Text style={[styles.itemValue, { color: theme.textMuted }]}>
@@ -62,6 +65,9 @@ export function SettingsPanel({
             const nextIndex = (currentIndex + 1) % SOUND_OPTIONS.length;
             updateSettings({ defaultSound: SOUND_OPTIONS[nextIndex].value });
           }}
+          accessibilityLabel={`Default sound, ${SOUND_OPTIONS.find((o) => o.value === settings.defaultSound)?.label}`}
+          accessibilityRole="button"
+          accessibilityHint="Tap to cycle through options"
         >
           <Text style={[styles.itemLabel, { color: theme.text }]}>Sound</Text>
           <Text style={[styles.itemValue, { color: theme.textMuted }]}>
@@ -76,6 +82,9 @@ export function SettingsPanel({
             const nextIndex = (currentIndex + 1) % DISMISS_OPTIONS.length;
             updateSettings({ defaultDismissType: DISMISS_OPTIONS[nextIndex].value });
           }}
+          accessibilityLabel={`Default dismiss method, ${DISMISS_OPTIONS.find((o) => o.value === settings.defaultDismissType)?.label}`}
+          accessibilityRole="button"
+          accessibilityHint="Tap to cycle through options"
         >
           <Text style={[styles.itemLabel, { color: theme.text }]}>Dismiss Method</Text>
           <Text style={[styles.itemValue, { color: theme.textMuted }]}>
@@ -111,6 +120,8 @@ export function SettingsPanel({
             }}
             trackColor={{ false: theme.switchTrackOff, true: theme.accent }}
             thumbColor={settings.bedtimeReminderEnabled ? '#FFFFFF' : theme.switchThumbOff}
+            accessibilityLabel="Bedtime reminder"
+            accessibilityRole="switch"
           />
         </View>
         {settings.bedtimeReminderEnabled && bedtimePickerVisible && (
@@ -135,6 +146,8 @@ export function SettingsPanel({
             <TouchableOpacity
               style={styles.item}
               onPress={() => setBedtimePickerVisible(true)}
+              accessibilityLabel={`Target bedtime, ${formatTimeWithPeriod(settings.bedtimeHour, settings.bedtimeMinute)}`}
+              accessibilityRole="button"
             >
               <Text style={[styles.itemLabel, { color: theme.text }]}>Target Bedtime</Text>
               <Text style={[styles.itemValue, { color: theme.textMuted }]}>
@@ -151,12 +164,38 @@ export function SettingsPanel({
             const nextIndex = (currentIndex + 1) % SLEEP_GOAL_OPTIONS.length;
             updateSettings({ sleepGoalHours: SLEEP_GOAL_OPTIONS[nextIndex] });
           }}
+          accessibilityLabel={`Sleep goal, ${settings.sleepGoalHours} hours`}
+          accessibilityRole="button"
+          accessibilityHint="Tap to cycle through options"
         >
           <Text style={[styles.itemLabel, { color: theme.text }]}>Sleep Goal</Text>
           <Text style={[styles.itemValue, { color: theme.textMuted }]}>
             {settings.sleepGoalHours % 1 === 0
               ? `${settings.sleepGoalHours} hours`
               : `${Math.floor(settings.sleepGoalHours)}h ${(settings.sleepGoalHours % 1) * 60}m`}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Shake Sensitivity - GAP-29 */}
+      <Text style={[styles.sectionHeader, { color: theme.textMuted }]}>Shake Dismiss</Text>
+      <View style={[styles.card, { backgroundColor: theme.card }]}>
+        <TouchableOpacity
+          style={styles.item}
+          onPress={() => {
+            const levels = [1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
+            const currentIndex = levels.indexOf(settings.shakeThreshold);
+            const nextIndex = (currentIndex === -1 ? 2 : (currentIndex + 1) % levels.length);
+            updateSettings({ shakeThreshold: levels[nextIndex] });
+          }}
+          accessibilityLabel={`Shake sensitivity, ${settings.shakeThreshold <= 1.25 ? 'High' : settings.shakeThreshold <= 1.75 ? 'Medium' : 'Low'}`}
+          accessibilityRole="button"
+          accessibilityHint="Tap to cycle through sensitivity levels"
+        >
+          <Text style={[styles.itemLabel, { color: theme.text }]}>Shake Sensitivity</Text>
+          <Text style={[styles.itemValue, { color: theme.textMuted }]}>
+            {settings.shakeThreshold <= 1.25 ? 'High' : settings.shakeThreshold <= 1.75 ? 'Medium' : 'Low'}
+            {` (${settings.shakeThreshold})`}
           </Text>
         </TouchableOpacity>
       </View>
@@ -171,6 +210,8 @@ export function SettingsPanel({
             onValueChange={(val) => updateSettings({ darkMode: val })}
             trackColor={{ false: theme.switchTrackOff, true: theme.accent }}
             thumbColor={settings.darkMode ? '#FFFFFF' : theme.switchThumbOff}
+            accessibilityLabel="Dark mode"
+            accessibilityRole="switch"
           />
         </View>
         <View style={[styles.divider, { backgroundColor: theme.surface }]} />
@@ -181,6 +222,8 @@ export function SettingsPanel({
             onValueChange={(val) => updateSettings({ hapticFeedback: val })}
             trackColor={{ false: theme.switchTrackOff, true: theme.accent }}
             thumbColor={settings.hapticFeedback ? '#FFFFFF' : theme.switchThumbOff}
+            accessibilityLabel="Haptic feedback"
+            accessibilityRole="switch"
           />
         </View>
       </View>
@@ -196,6 +239,8 @@ export function SettingsPanel({
         <TouchableOpacity
           style={styles.item}
           onPress={() => Alert.alert('Rate SoftWake', 'This will open the app store. (Coming soon)')}
+          accessibilityLabel="Rate SoftWake"
+          accessibilityRole="button"
         >
           <Text style={[styles.itemLabel, { color: theme.text }]}>Rate SoftWake</Text>
           <Text style={[styles.itemChevron, { color: theme.textMuted }]}>›</Text>
@@ -204,6 +249,8 @@ export function SettingsPanel({
         <TouchableOpacity
           style={styles.item}
           onPress={() => Alert.alert('Send Feedback', 'Feedback form coming soon.')}
+          accessibilityLabel="Send Feedback"
+          accessibilityRole="button"
         >
           <Text style={[styles.itemLabel, { color: theme.text }]}>Send Feedback</Text>
           <Text style={[styles.itemChevron, { color: theme.textMuted }]}>›</Text>
@@ -212,6 +259,8 @@ export function SettingsPanel({
         <TouchableOpacity
           style={styles.item}
           onPress={() => Alert.alert('Privacy Policy', 'Privacy policy page coming soon.')}
+          accessibilityLabel="Privacy Policy"
+          accessibilityRole="button"
         >
           <Text style={[styles.itemLabel, { color: theme.text }]}>Privacy Policy</Text>
           <Text style={[styles.itemChevron, { color: theme.textMuted }]}>›</Text>

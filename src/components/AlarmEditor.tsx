@@ -90,13 +90,13 @@ export function AlarmEditor({
         <ScrollView style={styles.modalScroll}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={onCancel}>
+              <TouchableOpacity onPress={onCancel} accessibilityLabel="Cancel" accessibilityRole="button">
                 <Text style={styles.cancelButton}>Cancel</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>
                 {editingAlarmId ? 'Edit Alarm' : 'New Alarm'}
               </Text>
-              <TouchableOpacity onPress={onSave}>
+              <TouchableOpacity onPress={onSave} accessibilityLabel="Save alarm" accessibilityRole="button">
                 <Text style={styles.saveButton}>Save</Text>
               </TouchableOpacity>
             </View>
@@ -120,6 +120,9 @@ export function AlarmEditor({
                       styles.dayButton,
                       selectedDays[index] && styles.dayButtonSelected,
                     ]}
+                    accessibilityLabel={`${day}, ${selectedDays[index] ? 'selected' : 'not selected'}`}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selectedDays[index] }}
                   >
                     <Text
                       style={[
@@ -142,6 +145,9 @@ export function AlarmEditor({
                 onChangeText={onLabelChange}
                 placeholder="Alarm"
                 placeholderTextColor="#444444"
+                maxLength={100}
+                accessibilityLabel="Alarm label"
+                accessibilityRole="text"
               />
             </View>
 
@@ -156,6 +162,9 @@ export function AlarmEditor({
                       styles.snoozeOption,
                       selectedSnooze === option.value && styles.snoozeOptionSelected,
                     ]}
+                    accessibilityLabel={`Snooze ${option.label}${selectedSnooze === option.value ? ', selected' : ''}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: selectedSnooze === option.value }}
                   >
                     <Text
                       style={[
@@ -176,6 +185,8 @@ export function AlarmEditor({
                 <TouchableOpacity
                   onPress={onPlayPreview}
                   style={styles.previewButton}
+                  accessibilityLabel="Preview alarm sound"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.previewButtonIcon}>🔊</Text>
                 </TouchableOpacity>
@@ -189,6 +200,9 @@ export function AlarmEditor({
                       styles.wakeIntensityOption,
                       selectedWakeIntensity === option.value && styles.wakeIntensityOptionSelected,
                     ]}
+                    accessibilityLabel={`Wake intensity ${option.label}${selectedWakeIntensity === option.value ? ', selected' : ''}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: selectedWakeIntensity === option.value }}
                   >
                     <Text
                       style={[
@@ -214,6 +228,9 @@ export function AlarmEditor({
                       styles.soundOption,
                       selectedSound === option.value && styles.soundOptionSelected,
                     ]}
+                    accessibilityLabel={`Sound ${option.label}${selectedSound === option.value ? ', selected' : ''}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: selectedSound === option.value }}
                   >
                     <Text style={styles.soundOptionIcon}>{option.icon}</Text>
                     <Text
@@ -240,6 +257,9 @@ export function AlarmEditor({
                       styles.dismissTypeOption,
                       selectedDismissType === option.value && styles.dismissTypeOptionSelected,
                     ]}
+                    accessibilityLabel={`Dismiss method ${option.label}${selectedDismissType === option.value ? ', selected' : ''}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: selectedDismissType === option.value }}
                   >
                     <Text style={styles.dismissTypeIcon}>{option.icon}</Text>
                     <View style={styles.dismissTypeTextContainer}>
@@ -274,6 +294,9 @@ export function AlarmEditor({
                       styles.dismissTypeOption,
                       selectedDismissType === option.value && styles.dismissTypeOptionSelected,
                     ]}
+                    accessibilityLabel={`Dismiss method ${option.label}${selectedDismissType === option.value ? ', selected' : ''}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: selectedDismissType === option.value }}
                   >
                     <Text style={styles.dismissTypeIcon}>{option.icon}</Text>
                     <View style={styles.dismissTypeTextContainer}>

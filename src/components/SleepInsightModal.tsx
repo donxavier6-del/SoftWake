@@ -52,12 +52,16 @@ export function SleepInsightModal({
           <TouchableOpacity
             style={styles.insightButton}
             onPress={() => onCreateAlarm(insight.hour, insight.minute)}
+            accessibilityLabel="Create alarm at optimal wake time"
+            accessibilityRole="button"
           >
             <Text style={styles.insightButtonText}>Create Alarm</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.insightDismiss}
             onPress={onDismiss}
+            accessibilityLabel="Dismiss sleep insight"
+            accessibilityRole="button"
           >
             <Text style={styles.insightDismissText}>Dismiss</Text>
           </TouchableOpacity>

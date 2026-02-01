@@ -12,13 +12,15 @@ import {
   Platform,
   AppState,
   Alert,
+  Linking,
+  ActivityIndicator,
 } from 'react-native';
+import { useFonts } from 'expo-font';
 import type { Alarm, SleepEntry, Settings, AlarmSound, DismissType, WakeIntensity, TabName, WeeklyDataPoint, SleepStatsResult } from './src/types';
 import { GestureHandlerRootView, PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import WheelPicker from 'react-native-wheel-scrollview-picker';
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
-// Accelerometer is now handled by useAlarmDismiss hook
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -38,6 +40,7 @@ import {
   formatTimeWithPeriod,
   formatTimeDisplay,
 } from './src/utils/timeFormatting';
+import { logger } from './src/utils/logger';
 import { InsightsChart } from './src/components/InsightsChart';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { SettingsPanel } from './src/components/SettingsPanel';
@@ -47,6 +50,8 @@ import { MorningTab } from './src/components/MorningTab';
 import { AlarmScreen } from './src/components/AlarmScreen';
 import { AlarmEditor } from './src/components/AlarmEditor';
 import { TimePicker } from './src/components/TimePicker';
+import { BedtimeModal } from './src/components/BedtimeModal';
+import { SleepInsightModal } from './src/components/SleepInsightModal';
 import { useAlarms } from './src/hooks/useAlarms';
 import { useSettings } from './src/hooks/useSettings';
 import { useAlarmSound } from './src/hooks/useAlarmSound';
@@ -63,31 +68,9 @@ import {
 // Check if running in Expo Go (where push notifications are not supported in SDK 53+)
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-// Configure notification handler (only in development builds, not Expo Go)
+// GAP-27: Use the exported setupNotificationHandler (includes GAP-02 silent Android notifications)
 if (!isExpoGo) {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
-
-  // Set up Android notification channel with IMPORTANCE_HIGH for alarms
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('alarms', {
-      name: 'Alarms',
-      importance: Notifications.AndroidImportance.MAX,
-      sound: 'default',
-      vibrationPattern: [0, 250, 250, 250],
-      enableLights: true,
-      lightColor: '#818CF8',
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-      bypassDnd: true,
-    });
-  }
+  setupNotificationHandler();
 }
 
 // Display constants for alarm dismiss UI
@@ -95,6 +78,16 @@ const REQUIRED_SHAKES = 20;
 const BREATHING_CYCLES_REQUIRED = 3;
 
 export default function App() {
+  // === FONT LOADING ===
+  const [fontsLoaded] = useFonts({
+    Inter_200ExtraLight: require('./assets/fonts/Inter_200ExtraLight.ttf'),
+    Inter_300Light: require('./assets/fonts/Inter_300Light.ttf'),
+    Inter_400Regular: require('./assets/fonts/Inter_400Regular.ttf'),
+    Inter_500Medium: require('./assets/fonts/Inter_500Medium.ttf'),
+    Inter_600SemiBold: require('./assets/fonts/Inter_600SemiBold.ttf'),
+    Inter_700Bold: require('./assets/fonts/Inter_700Bold.ttf'),
+  });
+
   // === HOOKS ===
   // Settings hook (must be first to get theme)
   const { settings, updateSettings, isLoading: settingsLoading } = useSettings();
@@ -213,7 +206,8 @@ export default function App() {
   } = useAlarmDismiss(
     alarmScreenVisible,
     activeAlarm?.dismissType || 'simple',
-    settings.hapticFeedback
+    settings.hapticFeedback,
+    settings.shakeThreshold
   );
 
   // === LOCAL STATE ===
@@ -222,8 +216,8 @@ export default function App() {
   // Sleep insight modal state
   const [sleepInsightVisible, setSleepInsightVisible] = useState(false);
 
-  // Combined loading state from hooks
-  const isLoaded = alarmsLoaded && !settingsLoading && !sleepLoading;
+  // Combined loading state from hooks (includes font loading)
+  const isLoaded = alarmsLoaded && !settingsLoading && !sleepLoading && fontsLoaded;
 
   // Settings state - now from useSettings hook
   const [bedtimePickerVisible, setBedtimePickerVisible] = useState(false);
@@ -248,17 +242,56 @@ export default function App() {
     scheduleNativeAlarms(alarms);
   }, [alarms, isLoaded]);
 
-  // Re-schedule native alarms when app comes to foreground
+  // GAP-05 & GAP-31: Track timezone and timestamp for detecting changes on foreground resume
+  const lastTimezoneRef = useRef<string>(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const lastForegroundTimestampRef = useRef<number>(Date.now());
+
+  // GAP-10: Track if battery optimization prompt has been shown
+  const batteryPromptShownRef = useRef<boolean>(false);
+
+  // Re-schedule native alarms when app comes to foreground + GAP-05/GAP-06/GAP-31 checks
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
+    const sub = AppState.addEventListener('change', async (state) => {
       if (state === 'active' && isLoaded) {
+        // GAP-05: Detect timezone changes and reschedule
+        const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (currentTimezone !== lastTimezoneRef.current) {
+          lastTimezoneRef.current = currentTimezone;
+          logger.log('Timezone changed, rescheduling all alarms');
+          scheduleAlarmNotificationsService(alarms);
+        }
+
+        // GAP-31: Detect significant time jumps (manual time changes)
+        const now = Date.now();
+        const elapsed = now - lastForegroundTimestampRef.current;
+        const expectedMaxElapsed = 24 * 60 * 60 * 1000; // 24 hours
+        if (elapsed < -120000 || elapsed > expectedMaxElapsed) {
+          logger.log('Significant time change detected, rescheduling all alarms');
+          scheduleAlarmNotificationsService(alarms);
+        }
+        lastForegroundTimestampRef.current = now;
+
+        // Always reschedule native alarms on foreground
         scheduleNativeAlarms(alarms);
+
+        // GAP-06: Check exact alarm permission on foreground resume
+        if (Platform.OS === 'android') {
+          const hasPermission = await nativeAlarm.checkExactAlarmPermission();
+          if (!hasPermission) {
+            Alert.alert(
+              'Alarm Permission Revoked',
+              'SoftWake needs exact alarm permission for reliable alarms. Please re-enable it.',
+              [
+                { text: 'Open Settings', onPress: () => nativeAlarm.openExactAlarmSettings() },
+                { text: 'Later', style: 'cancel' },
+              ]
+            );
+          }
+        }
       }
     });
     return () => sub.remove();
   }, [alarms, isLoaded]);
-
-  // Sleep data save is now handled by useSleepTracking hook
 
   // Schedule bedtime notification when settings change (AsyncStorage save handled by useSettings hook)
   useEffect(() => {
@@ -266,13 +299,20 @@ export default function App() {
     scheduleBedtimeNotificationService(settings);
   }, [settings, isLoaded]);
 
-  // Request notification permissions on mount (only in development builds, not Expo Go)
+  // GAP-16: Request notification permissions on mount with user-facing alert on denial
   useEffect(() => {
     if (isExpoGo) return;
     const requestPermissions = async () => {
       const { status } = await Notifications.requestPermissionsAsync();
       if (status !== 'granted') {
-        console.log('Notification permissions not granted');
+        Alert.alert(
+          'Notifications Required',
+          'SoftWake needs notification permission for alarms to work. Please enable in Settings.',
+          [
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            { text: 'Later', style: 'cancel' },
+          ]
+        );
       }
     };
     requestPermissions();
@@ -358,6 +398,7 @@ export default function App() {
   }, [resetAllDismiss, hookTriggerAlarm]);
 
   // Handle notification received (triggers alarm when notification fires)
+  // GAP-02: Only trigger if alarm screen is not already visible (native alarm handles it)
   useEffect(() => {
     if (isExpoGo) return;
 
@@ -365,6 +406,8 @@ export default function App() {
     const notificationReceivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
       const data = notification.request.content.data;
       if (data?.alarmId) {
+        // GAP-02: Don't trigger if alarm screen is already showing
+        if (alarmScreenVisible) return;
         const alarm = alarms.find((a) => a.id === data.alarmId);
         if (alarm && alarm.enabled) {
           triggerAlarmWithReset(alarm);
@@ -376,6 +419,8 @@ export default function App() {
     const notificationResponseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data;
       if (data?.alarmId) {
+        // GAP-02: Don't trigger if alarm screen is already showing
+        if (alarmScreenVisible) return;
         const alarm = alarms.find((a) => a.id === data.alarmId);
         if (alarm && alarm.enabled) {
           triggerAlarmWithReset(alarm);
@@ -387,7 +432,7 @@ export default function App() {
       notificationReceivedSubscription.remove();
       notificationResponseSubscription.remove();
     };
-  }, [alarms, triggerAlarmWithReset]);
+  }, [alarms, triggerAlarmWithReset, alarmScreenVisible]);
 
   // Check if app was launched from a native alarm notification tap
   useEffect(() => {
@@ -554,11 +599,14 @@ export default function App() {
       )}
 
       {/* Bottom Tab Bar */}
-      <View style={[styles.tabBar, { backgroundColor: theme.card, borderTopColor: theme.surface }]}>
+      <View style={[styles.tabBar, { backgroundColor: theme.cardAlt, borderTopColor: theme.divider }]} accessibilityRole="tablist">
         <TouchableOpacity
           style={styles.tabItem}
           onPress={() => setActiveTab('alarms')}
           activeOpacity={0.7}
+          accessibilityLabel="Alarms tab"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'alarms' }}
         >
           <Text style={[styles.tabIcon, { color: theme.textMuted }, activeTab === 'alarms' && { color: theme.accent }]}>
             {"⏰"}
@@ -572,6 +620,9 @@ export default function App() {
           style={styles.tabItem}
           onPress={() => setActiveTab('morning')}
           activeOpacity={0.7}
+          accessibilityLabel="Morning tab"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'morning' }}
         >
           <Text style={[styles.tabIcon, { color: theme.textMuted }, activeTab === 'morning' && { color: theme.accent }]}>
             {"☀\uFE0F"}
@@ -585,6 +636,9 @@ export default function App() {
           style={styles.tabItem}
           onPress={() => setActiveTab('insights')}
           activeOpacity={0.7}
+          accessibilityLabel="Insights tab"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'insights' }}
         >
           <Text style={[styles.tabIcon, { color: theme.textMuted }, activeTab === 'insights' && { color: theme.accent }]}>
             {"📊"}
@@ -598,6 +652,9 @@ export default function App() {
           style={styles.tabItem}
           onPress={() => setActiveTab('settings')}
           activeOpacity={0.7}
+          accessibilityLabel="Settings tab"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'settings' }}
         >
           <Text style={[styles.tabIcon, { color: theme.textMuted }, activeTab === 'settings' && { color: theme.accent }]}>
             {"⚙\uFE0F"}
@@ -664,91 +721,31 @@ export default function App() {
       />
 
       {/* Bedtime Logging Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
+      <BedtimeModal
         visible={bedtimeModalVisible}
-        onRequestClose={handleSkipBedtime}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.bedtimeModalContent}>
-            <Text style={styles.bedtimeTitle}>Log Your Sleep</Text>
-            <Text style={styles.bedtimeSubtitle}>When did you go to bed last night?</Text>
-
-            <TimePicker
-              hour={bedtimeHour}
-              minute={bedtimeMinute}
-              onHourChange={setBedtimeHour}
-              onMinuteChange={setBedtimeMinute}
-              minuteStep={5}
-              hapticFeedback={settings.hapticFeedback}
-            />
-
-            <TouchableOpacity style={styles.saveBedtimeButton} onPress={handleSaveBedtimeWithInsight}>
-              <Text style={styles.saveBedtimeButtonText}>Save</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.skipBedtimeButton} onPress={handleSkipBedtime}>
-              <Text style={styles.skipBedtimeButtonText}>Skip</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        bedtimeHour={bedtimeHour}
+        bedtimeMinute={bedtimeMinute}
+        onHourChange={setBedtimeHour}
+        onMinuteChange={setBedtimeMinute}
+        hapticFeedback={settings.hapticFeedback}
+        onSave={handleSaveBedtimeWithInsight}
+        onSkip={handleSkipBedtime}
+        TimePicker={TimePicker}
+      />
 
       {/* Sleep Insight Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
+      <SleepInsightModal
         visible={sleepInsightVisible}
-        onRequestClose={() => setSleepInsightVisible(false)}
-      >
-        <View style={styles.insightOverlay}>
-          <View style={styles.insightContent}>
-            <Text style={styles.insightTitle}>Sleep Insight</Text>
-            {(() => {
-              const insight = getOptimalWakeTime();
-              if (!insight) return null;
-              const avgHours = Math.floor(insight.avgSleep / 60);
-              const avgMins = insight.avgSleep % 60;
-              return (
-                <>
-                  <Text style={styles.insightText}>
-                    Based on your last 7 nights, you average{' '}
-                    <Text style={styles.insightHighlight}>
-                      {avgHours}h {avgMins}m
-                    </Text>{' '}
-                    of sleep.
-                  </Text>
-                  <Text style={styles.insightText}>
-                    For optimal rest (8 hours), try waking up at:
-                  </Text>
-                  <Text style={styles.insightTime}>
-                    {formatTimeWithPeriod(insight.hour, insight.minute)}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.insightButton}
-                    onPress={() => {
-                      handleAddAlarmWithDefaults();
-                      setSelectedHour(insight.hour);
-                      setSelectedMinute(insight.minute);
-                      setSelectedLabel('Optimal Wake');
-                      setSleepInsightVisible(false);
-                    }}
-                  >
-                    <Text style={styles.insightButtonText}>Create Alarm</Text>
-                  </TouchableOpacity>
-                </>
-              );
-            })()}
-            <TouchableOpacity
-              style={styles.insightDismiss}
-              onPress={() => setSleepInsightVisible(false)}
-            >
-              <Text style={styles.insightDismissText}>Dismiss</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        insight={getOptimalWakeTime()}
+        onCreateAlarm={(hour, minute) => {
+          handleAddAlarmWithDefaults();
+          setSelectedHour(hour);
+          setSelectedMinute(minute);
+          setSelectedLabel('Optimal Wake');
+          setSleepInsightVisible(false);
+        }}
+        onDismiss={() => setSleepInsightVisible(false)}
+      />
 
 
 
