@@ -4,6 +4,8 @@ import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { WAKE_INTENSITY_OPTIONS } from '../constants/options';
 import { nativeAlarm, getSoundResourceName } from '../services/nativeAlarm';
+import { dismissDeliveredAlarmNotifications } from '../services/notifications';
+import { logger } from '../utils/logger';
 import type { Alarm, AlarmSound, WakeIntensity } from '../types';
 
 const SOUND_CONFIGS: Record<AlarmSound, { rate: number; pattern: number[] | null }> = {
@@ -44,6 +46,15 @@ export function useAlarmTrigger(
   const snoozeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentTimeRef = useRef<Date>(new Date());
 
+  // GAP-02: Flag to track if native alarm already fired
+  const nativeAlarmFiredRef = useRef<boolean>(false);
+
+  // GAP-13: Guard against duplicate snooze on rapid press
+  const isSnoozingRef = useRef<boolean>(false);
+
+  // GAP-03: Queue for multiple simultaneous alarms
+  const alarmQueueRef = useRef<Alarm[]>([]);
+
   // Update current time ref every second
   useEffect(() => {
     const timer = setInterval(() => {
@@ -53,7 +64,7 @@ export function useAlarmTrigger(
     return () => clearInterval(timer);
   }, []);
 
-  // Check for alarm triggers every minute
+  // Check for alarm triggers every second
   useEffect(() => {
     const checkInterval = setInterval(() => {
       const now = currentTimeRef.current;
@@ -61,6 +72,9 @@ export function useAlarmTrigger(
       const currentMinute = now.getMinutes();
       const currentDay = now.getDay();
       const timeKey = `${currentHour}:${currentMinute}`;
+
+      // GAP-03: Collect all matching alarms
+      const matchingAlarms: Alarm[] = [];
 
       alarms.forEach((alarm) => {
         if (!alarm.enabled) return;
@@ -75,17 +89,36 @@ export function useAlarmTrigger(
         if (lastTriggeredRef.current === alarmKey) return;
         lastTriggeredRef.current = alarmKey;
 
-        triggerAlarm(alarm);
+        matchingAlarms.push(alarm);
       });
-    }, 1000); // Check every second, but trigger only once per minute
+
+      if (matchingAlarms.length > 0) {
+        // GAP-02: Skip if an alarm is already active (triggerAlarm also guards,
+        // but this avoids unnecessary queue manipulation)
+        if (nativeAlarmFiredRef.current) {
+          return;
+        }
+
+        // GAP-03: Queue alarms and trigger only the first
+        if (alarmQueueRef.current.length === 0 && !alarmScreenVisible) {
+          alarmQueueRef.current = matchingAlarms.slice(1);
+          triggerAlarm(matchingAlarms[0]);
+        } else {
+          // Add remaining to queue
+          alarmQueueRef.current.push(...matchingAlarms);
+        }
+      }
+    }, 1000);
 
     return () => clearInterval(checkInterval);
-  }, [alarms]);
+  }, [alarms, alarmScreenVisible]);
 
   // Reset last triggered ref when minute changes
   useEffect(() => {
     const resetInterval = setInterval(() => {
       lastTriggeredRef.current = '';
+      // GAP-02: Reset native alarm fired flag each minute
+      nativeAlarmFiredRef.current = false;
     }, 60000);
 
     return () => clearInterval(resetInterval);
@@ -158,7 +191,7 @@ export function useAlarmTrigger(
       }
 
     } catch (error) {
-      console.log('Error playing sound:', error);
+      logger.log('Error playing sound:', error);
     }
   }, []);
 
@@ -169,8 +202,6 @@ export function useAlarmTrigger(
     }
 
     // Stop the native Android alarm service first (MediaPlayer + vibration).
-    // This must run regardless of whether the JS sound cleanup succeeds,
-    // since the native foreground service is an independent sound source.
     try {
       await nativeAlarm.stopAlarm();
     } catch (e) {
@@ -189,6 +220,13 @@ export function useAlarmTrigger(
   }, []);
 
   const triggerAlarm = useCallback(async (alarm: Alarm) => {
+    // GAP-02: Synchronous guard prevents duplicate triggers from any source
+    // (JS interval, notification listener, or launch alarm check).
+    // React state updates are async, so alarmScreenVisible can be stale when
+    // multiple sources fire in the same tick. This ref is synchronous.
+    if (nativeAlarmFiredRef.current) return;
+    nativeAlarmFiredRef.current = true;
+
     if (hapticFeedback) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
@@ -204,8 +242,19 @@ export function useAlarmTrigger(
   }, [hapticFeedback, playAlarmSound]);
 
   const dismissAlarm = useCallback(async () => {
+    // GAP-12: Dismiss delivered notifications from the notification shade
+    if (activeAlarm) {
+      await dismissDeliveredAlarmNotifications(activeAlarm.id);
+    }
+
     await stopAlarmSound();
     setAlarmScreenVisible(false);
+
+    // GAP-02: Reset trigger guard so the next alarm can fire
+    nativeAlarmFiredRef.current = false;
+
+    // GAP-13: Reset snooze guard on dismiss
+    isSnoozingRef.current = false;
 
     // Call the callback if provided (for sleep tracking, etc.)
     if (onAlarmDismissed) {
@@ -213,17 +262,37 @@ export function useAlarmTrigger(
     }
 
     setActiveAlarm(null);
-  }, [stopAlarmSound, onAlarmDismissed]);
+
+    // GAP-03: Process next alarm in queue
+    if (alarmQueueRef.current.length > 0) {
+      const nextAlarm = alarmQueueRef.current.shift()!;
+      setTimeout(() => {
+        triggerAlarm(nextAlarm);
+      }, 1000);
+    }
+  }, [activeAlarm, stopAlarmSound, onAlarmDismissed, triggerAlarm]);
 
   const snoozeAlarm = useCallback(async () => {
     if (!activeAlarm || activeAlarm.snooze === 0) return;
+
+    // GAP-13: Prevent duplicate snooze on rapid press
+    if (isSnoozingRef.current) return;
+    isSnoozingRef.current = true;
 
     if (patternIntervalRef.current) {
       clearTimeout(patternIntervalRef.current);
       patternIntervalRef.current = null;
     }
+
+    // GAP-12: Dismiss delivered notifications from the shade.
+    // Don't cancel scheduled notifications — recurring alarms need them for next week.
+    await dismissDeliveredAlarmNotifications(activeAlarm.id);
+
     await stopAlarmSound();
     setAlarmScreenVisible(false);
+
+    // GAP-02: Reset trigger guard so the snooze re-trigger can fire
+    nativeAlarmFiredRef.current = false;
 
     // Try native snooze first (survives app kill), fall back to setTimeout
     const soundResource = getSoundResourceName(activeAlarm.sound);
@@ -243,6 +312,8 @@ export function useAlarmTrigger(
     }
 
     setActiveAlarm(null);
+    // GAP-13: Reset snooze guard after snooze completes
+    isSnoozingRef.current = false;
   }, [activeAlarm, stopAlarmSound, triggerAlarm]);
 
   return {

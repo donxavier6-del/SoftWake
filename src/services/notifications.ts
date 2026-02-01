@@ -3,6 +3,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import type { Alarm, Settings } from '../types';
 import { formatTimeWithPeriod } from '../utils/timeFormatting';
+import { logger } from '../utils/logger';
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 const BEDTIME_NOTIFICATION_ID = 'bedtime-reminder';
@@ -71,6 +72,13 @@ export async function scheduleAlarmNotifications(alarms: Alarm[]): Promise<void>
 
     const hasRepeatingDays = alarm.days.some((d) => d);
 
+    // GAP-30: Trim label and use fallback for empty strings
+    const title = alarm.label?.trim() || 'SoftWake Alarm';
+
+    // GAP-02: On Android, notifications are informational only (no sound/vibration).
+    // The native AlarmService handles the actual alarm sound.
+    const isAndroid = Platform.OS === 'android';
+
     if (hasRepeatingDays) {
       // Schedule for each selected day of the week
       for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
@@ -82,11 +90,11 @@ export async function scheduleAlarmNotifications(alarms: Alarm[]): Promise<void>
         await Notifications.scheduleNotificationAsync({
           identifier: `${ALARM_NOTIFICATION_PREFIX}${alarm.id}-${dayIndex}`,
           content: {
-            title: alarm.label || 'SoftWake Alarm',
+            title,
             body: `Alarm for ${formatTimeWithPeriod(alarm.hour, alarm.minute)}`,
-            sound: true,
+            sound: isAndroid ? false : true,
             data: { alarmId: alarm.id },
-            ...(Platform.OS === 'android' && { channelId: 'alarms' }),
+            ...(isAndroid && { channelId: 'alarms' }),
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
@@ -110,11 +118,11 @@ export async function scheduleAlarmNotifications(alarms: Alarm[]): Promise<void>
       await Notifications.scheduleNotificationAsync({
         identifier: `${ALARM_NOTIFICATION_PREFIX}${alarm.id}-once`,
         content: {
-          title: alarm.label || 'SoftWake Alarm',
+          title,
           body: `Alarm for ${formatTimeWithPeriod(alarm.hour, alarm.minute)}`,
-          sound: true,
+          sound: isAndroid ? false : true,
           data: { alarmId: alarm.id },
-          ...(Platform.OS === 'android' && { channelId: 'alarms' }),
+          ...(isAndroid && { channelId: 'alarms' }),
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -122,6 +130,46 @@ export async function scheduleAlarmNotifications(alarms: Alarm[]): Promise<void>
         },
       });
     }
+  }
+}
+
+/**
+ * GAP-12: Cancel scheduled alarm notifications matching a specific alarm ID.
+ * Use this when permanently disabling an alarm (not for snooze/dismiss).
+ */
+export async function cancelAlarmNotification(alarmId: string): Promise<void> {
+  if (isExpoGo) return;
+
+  try {
+    const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notification of scheduledNotifications) {
+      if (notification.identifier.startsWith(`${ALARM_NOTIFICATION_PREFIX}${alarmId}-`)) {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+      }
+    }
+  } catch (error) {
+    logger.error('Failed to cancel alarm notification:', error);
+  }
+}
+
+/**
+ * GAP-12: Dismiss delivered/presented notifications for a specific alarm from
+ * the notification shade. Unlike cancelAlarmNotification, this does NOT cancel
+ * scheduled future occurrences — recurring weekly alarms stay intact.
+ * Use this on snooze and dismiss.
+ */
+export async function dismissDeliveredAlarmNotifications(alarmId: string): Promise<void> {
+  if (isExpoGo) return;
+
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    for (const notification of presented) {
+      if (notification.request.identifier.startsWith(`${ALARM_NOTIFICATION_PREFIX}${alarmId}`)) {
+        await Notifications.dismissNotificationAsync(notification.request.identifier);
+      }
+    }
+  } catch (error) {
+    logger.error('Failed to dismiss delivered alarm notifications:', error);
   }
 }
 
@@ -135,7 +183,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /**
- * Set up notification handler and Android channel
+ * GAP-27: Set up notification handler and Android channel (exported for re-calling on settings change)
  */
 export function setupNotificationHandler(): void {
   if (isExpoGo) return;
@@ -143,7 +191,8 @@ export function setupNotificationHandler(): void {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
-      shouldPlaySound: true,
+      // GAP-02: On Android, don't play sound from notifications (AlarmService handles it)
+      shouldPlaySound: Platform.OS !== 'android',
       shouldSetBadge: false,
       shouldShowBanner: true,
       shouldShowList: true,
@@ -155,7 +204,7 @@ export function setupNotificationHandler(): void {
     Notifications.setNotificationChannelAsync('alarms', {
       name: 'Alarms',
       importance: Notifications.AndroidImportance.MAX,
-      sound: 'default',
+      sound: undefined, // GAP-02: No sound from notification channel
       vibrationPattern: [0, 250, 250, 250],
       enableLights: true,
       lightColor: '#818CF8',
