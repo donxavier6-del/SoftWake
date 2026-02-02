@@ -280,7 +280,7 @@ export default function App() {
           if (!hasPermission) {
             Alert.alert(
               'Alarm Permission Revoked',
-              'SoftWake needs exact alarm permission for reliable alarms. Please re-enable it.',
+              'AlarmLit needs exact alarm permission for reliable alarms. Please re-enable it.',
               [
                 { text: 'Open Settings', onPress: () => nativeAlarm.openExactAlarmSettings() },
                 { text: 'Later', style: 'cancel' },
@@ -307,7 +307,7 @@ export default function App() {
       if (status !== 'granted') {
         Alert.alert(
           'Notifications Required',
-          'SoftWake needs notification permission for alarms to work. Please enable in Settings.',
+          'AlarmLit needs notification permission for alarms to work. Please enable in Settings.',
           [
             { text: 'Open Settings', onPress: () => Linking.openSettings() },
             { text: 'Later', style: 'cancel' },

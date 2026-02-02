@@ -1,5 +1,5 @@
 /**
- * Font family constants for SoftWake.
+ * Font family constants for AlarmLit.
  * Maps font weight names to Inter font family strings.
  */
 export const FONTS = {

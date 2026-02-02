@@ -11,7 +11,7 @@ import { safeJsonParse } from '../utils/safeJsonParse';
 import { validateSettings } from '../utils/validation';
 import { logger } from '../utils/logger';
 
-const STORAGE_KEY = '@softwake_settings';
+const STORAGE_KEY = '@alarmlit_settings';
 
 const DEFAULT_SETTINGS: Settings = {
   bedtimeReminderEnabled: false,

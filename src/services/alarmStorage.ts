@@ -3,7 +3,7 @@ import { safeJsonParse } from '../utils/safeJsonParse';
 import { logger } from '../utils/logger';
 import { getSecureItem, setSecureItem } from './secureStorage';
 
-const STORAGE_KEY = 'softwake_scheduled_alarms';
+const STORAGE_KEY = 'alarmlit_scheduled_alarms';
 
 export interface StoredAlarm {
   id: string;

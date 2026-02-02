@@ -1,4 +1,4 @@
-package com.donxavier6.softwake.alarm
+package com.donxavier6.alarmlit.alarm
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -12,7 +12,7 @@ import java.util.Calendar
 
 class BootReceiver : BroadcastReceiver() {
     companion object {
-        private const val TAG = "SoftWakeBootReceiver"
+        private const val TAG = "AlarmLitBootReceiver"
     }
 
     override fun onReceive(context: Context, intent: Intent) {

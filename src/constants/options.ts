@@ -1,5 +1,5 @@
 /**
- * Configuration options and constants for SoftWake app
+ * Configuration options and constants for AlarmLit app
  */
 
 // Type definitions (mirrored from App.tsx)

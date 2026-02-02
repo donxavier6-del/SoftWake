@@ -1,4 +1,4 @@
-# SoftWake
+# AlarmLit
 
 A premium alarm clock app built with React Native and Expo.
 

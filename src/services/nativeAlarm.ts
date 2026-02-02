@@ -63,7 +63,7 @@ class NativeAlarmManager implements NativeAlarmService {
     if (!hasPermission) {
       Alert.alert(
         'Exact Alarm Permission Required',
-        'SoftWake needs permission to schedule exact alarms for reliable wake-ups. Please enable it in Settings.',
+        'AlarmLit needs permission to schedule exact alarms for reliable wake-ups. Please enable it in Settings.',
         [
           { text: 'Open Settings', onPress: () => this.openExactAlarmSettings() },
           { text: 'Later', style: 'cancel' },

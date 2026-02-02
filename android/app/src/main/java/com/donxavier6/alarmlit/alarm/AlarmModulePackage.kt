@@ -1,4 +1,4 @@
-package com.donxavier6.softwake.alarm
+package com.donxavier6.alarmlit.alarm
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

@@ -1,7 +1,7 @@
 import type { Theme } from '../types';
 
 /**
- * Theme definitions for SoftWake app.
+ * Theme definitions for AlarmLit app.
  * Contains color schemes for dark and light modes.
  */
 export const THEMES: { dark: Theme; light: Theme } = {

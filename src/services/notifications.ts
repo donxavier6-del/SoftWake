@@ -73,7 +73,7 @@ export async function scheduleAlarmNotifications(alarms: Alarm[]): Promise<void>
     const hasRepeatingDays = alarm.days.some((d) => d);
 
     // GAP-30: Trim label and use fallback for empty strings
-    const title = alarm.label?.trim() || 'SoftWake Alarm';
+    const title = alarm.label?.trim() || 'AlarmLit Alarm';
 
     // GAP-02: On Android, notifications are informational only (no sound/vibration).
     // The native AlarmService handles the actual alarm sound.

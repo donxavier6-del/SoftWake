@@ -35,7 +35,7 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="exp+softwake"/>
+        <data android:scheme="exp+alarmlit"/>
       </intent-filter>
     </activity>
     <receiver android:name=".alarm.AlarmReceiver" android:exported="false"/>

@@ -1,7 +1,7 @@
-# SoftWake Refactoring Log
+# AlarmLit Refactoring Log
 
 ## Project Overview
-**SoftWake** - A premium alarm clock app built with React Native + Expo SDK 54 + TypeScript
+**AlarmLit** - A premium alarm clock app built with React Native + Expo SDK 54 + TypeScript
 
 **Goal:** Refactor a monolithic ~3,900-line `App.tsx` into a modular architecture with target of ~800 lines
 

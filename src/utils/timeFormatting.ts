@@ -1,5 +1,5 @@
 /**
- * Time formatting utilities for SoftWake app
+ * Time formatting utilities for AlarmLit app
  * Consolidates all time display formatting in one place
  */
 

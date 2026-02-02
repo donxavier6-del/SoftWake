@@ -1,4 +1,4 @@
-# SoftWake - Combined Gap Analysis (Master)
+# AlarmLit - Combined Gap Analysis (Master)
 
 **Date:** January 31, 2026
 **Sources:** Original 25-gap analysis + secondary 31-gap analysis, deduplicated and merged
@@ -9,7 +9,7 @@
 ## Tier 1: CRITICAL (9)
 
 ### GAP-01. Device Reboot Loses Scheduled Alarms
-**File:** `android/app/src/main/java/com/donxavier6/softwake/alarm/BootReceiver.kt`
+**File:** `android/app/src/main/java/com/donxavier6/alarmlit/alarm/BootReceiver.kt`
 **Issue:** `BootReceiver.kt` receives `BOOT_COMPLETED` but only logs the event. After reboot, all `AlarmManager` alarms are cleared by the OS. Alarms are only rescheduled when the user opens the app.
 **Impact:** If a user sets an alarm, reboots their phone, and never opens the app before alarm time, the alarm will not fire.
 **Fix:** `BootReceiver` should read alarms from AsyncStorage (or a shared native store) and reschedule them via `AlarmManager` without requiring the React Native JS layer to initialize.
@@ -254,9 +254,9 @@ The native alarm starts `AlarmService` (plays sound), then JS interval detects t
 
 ### GAP-30. Empty String Label Treated as Truthy
 **File:** `src/services/notifications.ts:85`
-**Issue:** `alarm.label || 'SoftWake Alarm'` treats empty string as falsy, but whitespace-only labels (e.g., `"  "`) pass through.
+**Issue:** `alarm.label || 'AlarmLit Alarm'` treats empty string as falsy, but whitespace-only labels (e.g., `"  "`) pass through.
 **Impact:** Notification title shows blank spaces instead of default label.
-**Fix:** Use `alarm.label?.trim() || 'SoftWake Alarm'`.
+**Fix:** Use `alarm.label?.trim() || 'AlarmLit Alarm'`.
 
 ---
 

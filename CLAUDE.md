@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-SoftWake - a premium alarm clock app. React Native + Expo SDK 54 + TypeScript.
+AlarmLit - a premium alarm clock app. React Native + Expo SDK 54 + TypeScript.
 
 **Refactored Architecture** (January 2026): The app has been refactored from a monolithic ~3,900-line `App.tsx` to a modular architecture. `App.tsx` is now 889 lines and serves as the main coordinator, with logic extracted into hooks, components, and services.
 
@@ -72,9 +72,9 @@ src/
 - AsyncStorage for persistence
 
 ### Persistence Keys
-- `@softwake_alarms` - alarm list
-- `@softwake_sleep_data` - sleep tracking entries
-- `@softwake_settings` - user preferences
+- `@alarmlit_alarms` - alarm list
+- `@alarmlit_sleep_data` - sleep tracking entries
+- `@alarmlit_settings` - user preferences
 
 ## Key Dependencies
 

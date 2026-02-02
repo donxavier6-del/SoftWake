@@ -1,4 +1,4 @@
-package com.donxavier6.softwake.alarm
+package com.donxavier6.alarmlit.alarm
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -187,7 +187,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
             val prefs = getEncryptedPrefs(reactContext)
             prefs.edit().putString("alarms", alarmsJson).apply()
             // Remove legacy unencrypted data if it exists
-            val legacy = reactContext.getSharedPreferences("softwake_alarms_native", Context.MODE_PRIVATE)
+            val legacy = reactContext.getSharedPreferences("alarmlit_alarms_native", Context.MODE_PRIVATE)
             if (legacy.contains("alarms")) {
                 legacy.edit().remove("alarms").apply()
             }
@@ -198,7 +198,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
     }
 
     companion object {
-        private const val ENCRYPTED_PREFS_NAME = "softwake_alarms_encrypted"
+        private const val ENCRYPTED_PREFS_NAME = "alarmlit_alarms_encrypted"
 
         fun getEncryptedPrefs(context: Context): SharedPreferences {
             val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
@@ -221,7 +221,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
             if (alarmsJson != null) return alarmsJson
 
             // Migrate from legacy unencrypted store
-            val legacy = context.getSharedPreferences("softwake_alarms_native", Context.MODE_PRIVATE)
+            val legacy = context.getSharedPreferences("alarmlit_alarms_native", Context.MODE_PRIVATE)
             val legacyJson = legacy.getString("alarms", null)
             if (legacyJson != null) {
                 encrypted.edit().putString("alarms", legacyJson).apply()

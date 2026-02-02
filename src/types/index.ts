@@ -1,5 +1,5 @@
 /**
- * Shared types for SoftWake app
+ * Shared types for AlarmLit app
  */
 
 export type AlarmSound = 'sunrise' | 'ocean' | 'forest' | 'chimes' | 'piano' | 'birds';

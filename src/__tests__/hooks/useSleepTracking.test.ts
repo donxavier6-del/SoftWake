@@ -75,7 +75,7 @@ describe('useSleepTracking', () => {
         createSleepEntry(0, 8),
         createSleepEntry(1, 7),
       ];
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(mockData));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify(mockData));
 
       const { result } = renderHook(() => useSleepTracking());
 
@@ -102,7 +102,7 @@ describe('useSleepTracking', () => {
     });
 
     it('should handle corrupted AsyncStorage data gracefully', async () => {
-      await AsyncStorage.setItem('@softwake_sleep_data', 'invalid json{{{');
+      await AsyncStorage.setItem('@alarmlit_sleep_data', 'invalid json{{{');
 
       const { result } = renderHook(() => useSleepTracking());
 
@@ -134,7 +134,7 @@ describe('useSleepTracking', () => {
         createSleepEntry(1, 7), // Yesterday
         createSleepEntry(2, 6), // 2 days ago
       ];
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(mockData));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify(mockData));
 
       const { result } = renderHook(() => useSleepTracking());
 
@@ -152,7 +152,7 @@ describe('useSleepTracking', () => {
 
     it('should calculate correct duration in hours', async () => {
       const mockData: SleepEntry[] = [createSleepEntry(0, 8)];
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(mockData));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify(mockData));
 
       const { result } = renderHook(() => useSleepTracking());
 
@@ -167,7 +167,7 @@ describe('useSleepTracking', () => {
 
     it('should return 0 duration for days without sleep data', async () => {
       const mockData: SleepEntry[] = [createSleepEntry(0, 8)];
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(mockData));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify(mockData));
 
       const { result } = renderHook(() => useSleepTracking());
 
@@ -214,7 +214,7 @@ describe('useSleepTracking', () => {
         createSleepEntry(0, 8),
         createSleepEntry(1, 6),
       ];
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(mockData));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify(mockData));
 
       const { result } = renderHook(() => useSleepTracking());
 
@@ -234,7 +234,7 @@ describe('useSleepTracking', () => {
         createSleepEntry(1, 5), // worst - 300 min
         createSleepEntry(2, 7), // middle - 420 min
       ];
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(mockData));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify(mockData));
 
       const { result } = renderHook(() => useSleepTracking());
 
@@ -263,7 +263,7 @@ describe('useSleepTracking', () => {
           new Date(today).setHours(7, 0, 0, 0) // 7:00 AM today
         ),
       ];
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(mockData));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify(mockData));
 
       const { result } = renderHook(() => useSleepTracking());
 
@@ -279,7 +279,7 @@ describe('useSleepTracking', () => {
 
     it('should handle single entry', async () => {
       const mockData: SleepEntry[] = [createSleepEntry(0, 7)];
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(mockData));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify(mockData));
 
       const { result } = renderHook(() => useSleepTracking());
 
@@ -366,7 +366,7 @@ describe('useSleepTracking', () => {
 
       // Wait for AsyncStorage save
       await waitFor(async () => {
-        const stored = await AsyncStorage.getItem('@softwake_sleep_data');
+        const stored = await AsyncStorage.getItem('@alarmlit_sleep_data');
         expect(stored).not.toBeNull();
         const parsed = JSON.parse(stored!);
         expect(parsed).toHaveLength(1);
@@ -402,7 +402,7 @@ describe('useSleepTracking', () => {
 
     it('should append to existing sleep data', async () => {
       const existingData: SleepEntry[] = [createSleepEntry(1, 7)];
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(existingData));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify(existingData));
 
       const { result } = renderHook(() => useSleepTracking());
 
@@ -568,7 +568,7 @@ describe('useSleepTracking', () => {
 
       // Wait for debounced persistence (500ms debounce)
       await waitFor(async () => {
-        const stored = await AsyncStorage.getItem('@softwake_sleep_data');
+        const stored = await AsyncStorage.getItem('@alarmlit_sleep_data');
         expect(stored).not.toBeNull();
         const parsed = JSON.parse(stored!);
         expect(parsed).toHaveLength(1);
@@ -578,7 +578,7 @@ describe('useSleepTracking', () => {
     it('should load saved data on re-mount', async () => {
       // First, save some data
       const mockData: SleepEntry[] = [createSleepEntry(0, 8), createSleepEntry(1, 7)];
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(mockData));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify(mockData));
 
       // First hook instance
       const { result: result1, unmount } = renderHook(() => useSleepTracking());
@@ -671,7 +671,7 @@ describe('useSleepTracking', () => {
     });
 
     it('should handle empty array in AsyncStorage', async () => {
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify([]));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify([]));
 
       const { result } = renderHook(() => useSleepTracking());
 
@@ -685,7 +685,7 @@ describe('useSleepTracking', () => {
 
     it('should not save to AsyncStorage during initial load', async () => {
       const mockData: SleepEntry[] = [createSleepEntry(0, 8)];
-      await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(mockData));
+      await AsyncStorage.setItem('@alarmlit_sleep_data', JSON.stringify(mockData));
 
       const setItemSpy = jest.spyOn(AsyncStorage, 'setItem');
 

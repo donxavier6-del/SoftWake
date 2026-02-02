@@ -238,11 +238,11 @@ export function SettingsPanel({
         <View style={[styles.divider, { backgroundColor: theme.surface }]} />
         <TouchableOpacity
           style={styles.item}
-          onPress={() => Alert.alert('Rate SoftWake', 'This will open the app store. (Coming soon)')}
-          accessibilityLabel="Rate SoftWake"
+          onPress={() => Alert.alert('Rate AlarmLit', 'This will open the app store. (Coming soon)')}
+          accessibilityLabel="Rate AlarmLit"
           accessibilityRole="button"
         >
-          <Text style={[styles.itemLabel, { color: theme.text }]}>Rate SoftWake</Text>
+          <Text style={[styles.itemLabel, { color: theme.text }]}>Rate AlarmLit</Text>
           <Text style={[styles.itemChevron, { color: theme.textMuted }]}>›</Text>
         </TouchableOpacity>
         <View style={[styles.divider, { backgroundColor: theme.surface }]} />

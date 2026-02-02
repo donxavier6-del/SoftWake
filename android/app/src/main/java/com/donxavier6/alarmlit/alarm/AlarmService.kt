@@ -1,4 +1,4 @@
-package com.donxavier6.softwake.alarm
+package com.donxavier6.alarmlit.alarm
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -25,8 +25,8 @@ class AlarmService : Service() {
     private var vibrator: Vibrator? = null
 
     companion object {
-        private const val TAG = "SoftWakeAlarmService"
-        const val CHANNEL_ID = "softwake_alarm_channel"
+        private const val TAG = "AlarmLitAlarmService"
+        const val CHANNEL_ID = "alarmlit_alarm_channel"
         const val NOTIFICATION_ID = 1001
     }
 
@@ -48,7 +48,7 @@ class AlarmService : Service() {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK,
-                "SoftWake::AlarmWakeLock"
+                "AlarmLit::AlarmWakeLock"
             ).apply {
                 acquire(30 * 60 * 1000L) // GAP-18: Extended to 30 minutes for longer alarm sessions
             }
@@ -61,7 +61,7 @@ class AlarmService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "SoftWake Alarm",
+                "AlarmLit Alarm",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Alarm notifications"
@@ -104,7 +104,7 @@ class AlarmService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("SoftWake Alarm")
+            .setContentTitle("AlarmLit Alarm")
             .setContentText("Time to wake up gently")
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setPriority(NotificationCompat.PRIORITY_MAX)

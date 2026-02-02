@@ -13,7 +13,7 @@ import { safeJsonParse } from '../utils/safeJsonParse';
 import { validateSleepEntry } from '../utils/validation';
 import { logger } from '../utils/logger';
 
-const SLEEP_STORAGE_KEY = '@softwake_sleep_data';
+const SLEEP_STORAGE_KEY = '@alarmlit_sleep_data';
 
 export interface WeeklyDataPoint {
   day: string;

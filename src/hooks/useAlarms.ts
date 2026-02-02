@@ -12,7 +12,7 @@ import { validateAlarm, clampHour, clampMinute } from '../utils/validation';
 import { generateAlarmId } from '../services/nativeAlarm';
 import { logger } from '../utils/logger';
 
-const STORAGE_KEY = '@softwake_alarms';
+const STORAGE_KEY = '@alarmlit_alarms';
 
 export interface UseAlarmsReturn {
   // Alarm list

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "SoftWake",
-    "slug": "softwake",
+    "name": "AlarmLit",
+    "slug": "alarmlit",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -37,7 +37,7 @@
       },
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
-      "package": "com.donxavier6.softwake"
+      "package": "com.donxavier6.alarmlit"
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -1,4 +1,4 @@
-package com.donxavier6.softwake
+package com.donxavier6.alarmlit
 
 import android.app.Application
 import android.content.res.Configuration
@@ -13,7 +13,7 @@ import com.facebook.react.common.ReleaseLevel
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint
 import com.facebook.react.defaults.DefaultReactNativeHost
 
-import com.donxavier6.softwake.alarm.AlarmModulePackage
+import com.donxavier6.alarmlit.alarm.AlarmModulePackage
 
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper

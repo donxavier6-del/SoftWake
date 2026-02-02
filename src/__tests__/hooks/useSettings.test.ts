@@ -46,7 +46,7 @@ describe('useSettings', () => {
         hapticFeedback: false,
         sleepGoalHours: 7,
       };
-      await AsyncStorage.setItem('@softwake_settings', JSON.stringify(storedSettings));
+      await AsyncStorage.setItem('@alarmlit_settings', JSON.stringify(storedSettings));
 
       const { result } = renderHook(() => useSettings());
 
@@ -64,7 +64,7 @@ describe('useSettings', () => {
     });
 
     it('should handle empty object in AsyncStorage', async () => {
-      await AsyncStorage.setItem('@softwake_settings', JSON.stringify({}));
+      await AsyncStorage.setItem('@alarmlit_settings', JSON.stringify({}));
 
       const { result } = renderHook(() => useSettings());
 
@@ -127,7 +127,7 @@ describe('useSettings', () => {
 
       // Wait for AsyncStorage save
       await waitFor(async () => {
-        const stored = await AsyncStorage.getItem('@softwake_settings');
+        const stored = await AsyncStorage.getItem('@alarmlit_settings');
         expect(JSON.parse(stored!).darkMode).toBe(false);
       });
     });
@@ -238,7 +238,7 @@ describe('useSettings', () => {
       });
 
       await waitFor(async () => {
-        const stored = await AsyncStorage.getItem('@softwake_settings');
+        const stored = await AsyncStorage.getItem('@alarmlit_settings');
         const parsed = JSON.parse(stored!);
         expect(parsed).toMatchObject(newSettings);
       });
@@ -260,7 +260,7 @@ describe('useSettings', () => {
       });
 
       await waitFor(async () => {
-        const stored = await AsyncStorage.getItem('@softwake_settings');
+        const stored = await AsyncStorage.getItem('@alarmlit_settings');
         expect(JSON.parse(stored!).darkMode).toBe(false);
       });
 
@@ -285,7 +285,7 @@ describe('useSettings', () => {
       // Suppress expected console.error for this test
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
       
-      await AsyncStorage.setItem('@softwake_settings', 'invalid json{{{');
+      await AsyncStorage.setItem('@alarmlit_settings', 'invalid json{{{');
 
       const { result } = renderHook(() => useSettings());
 
@@ -338,7 +338,7 @@ describe('useSettings', () => {
         oldField: 'should be ignored',
         anotherOldField: 123,
       };
-      await AsyncStorage.setItem('@softwake_settings', JSON.stringify(storedWithExtra));
+      await AsyncStorage.setItem('@alarmlit_settings', JSON.stringify(storedWithExtra));
 
       const { result } = renderHook(() => useSettings());
 
@@ -354,7 +354,7 @@ describe('useSettings', () => {
 
     it('should load settings correctly after initial load', async () => {
       // Pre-populate AsyncStorage
-      await AsyncStorage.setItem('@softwake_settings', JSON.stringify({ sleepGoalHours: 9 }));
+      await AsyncStorage.setItem('@alarmlit_settings', JSON.stringify({ sleepGoalHours: 9 }));
 
       const { result } = renderHook(() => useSettings());
 
