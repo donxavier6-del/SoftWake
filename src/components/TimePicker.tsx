@@ -8,6 +8,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import WheelPicker from 'react-native-wheel-scrollview-picker';
 import * as Haptics from 'expo-haptics';
 import { clampHour } from '../utils/validation';
+import { THEMES } from '../constants/themes';
 
 export interface TimePickerProps {
   hour: number;          // 0-23 (24-hour format internally)
@@ -111,12 +112,12 @@ export function TimePicker({
   );
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} accessibilityRole="adjustable" accessibilityLabel="Time picker">
       {/* Selection highlight overlay */}
       <View style={styles.selectionHighlight} pointerEvents="none" />
 
       {/* Hour picker */}
-      <View style={styles.wheelWrapper}>
+      <View style={styles.wheelWrapper} accessibilityLabel={`Hour, ${displayHour}`}>
         <WheelPicker
           dataSource={HOURS}
           selectedIndex={HOURS.indexOf(displayHour)}
@@ -133,7 +134,7 @@ export function TimePicker({
       <Text style={styles.separator}>:</Text>
 
       {/* Minute picker */}
-      <View style={styles.wheelWrapper}>
+      <View style={styles.wheelWrapper} accessibilityLabel={`Minute, ${minute.toString().padStart(2, '0')}`}>
         <WheelPicker
           dataSource={minuteOptions}
           selectedIndex={minuteOptions.indexOf(minute)}
@@ -148,7 +149,7 @@ export function TimePicker({
       </View>
 
       {/* AM/PM picker */}
-      <View style={styles.ampmWrapper}>
+      <View style={styles.ampmWrapper} accessibilityLabel={`Period, ${isPM ? 'PM' : 'AM'}`}>
         <WheelPicker
           dataSource={AMPM}
           selectedIndex={isPM ? 1 : 0}
@@ -171,7 +172,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: THEMES.dark.card,
     borderRadius: 20,
     marginHorizontal: 16,
     marginVertical: 12,
@@ -186,10 +187,10 @@ const styles = StyleSheet.create({
     height: 60,
     top: '50%',
     marginTop: -30,
-    backgroundColor: 'rgba(129, 140, 248, 0.12)',
+    backgroundColor: THEMES.dark.accentSoft,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(129, 140, 248, 0.25)',
+    borderColor: THEMES.dark.accentGlow,
   },
   wheelWrapper: {
     width: 80,
@@ -210,27 +211,27 @@ const styles = StyleSheet.create({
   itemText: {
     fontSize: 36,
     fontWeight: '200',
-    color: 'rgba(255, 255, 255, 0.35)',
+    color: THEMES.dark.textDisabled,
   },
   selectedItemText: {
     fontSize: 42,
     fontWeight: '300',
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
   },
   ampmText: {
     fontSize: 24,
     fontWeight: '400',
-    color: 'rgba(255, 255, 255, 0.35)',
+    color: THEMES.dark.textDisabled,
   },
   selectedAmpmText: {
     fontSize: 28,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
   },
   separator: {
     fontSize: 42,
     fontWeight: '200',
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
     marginHorizontal: 4,
   },
 });

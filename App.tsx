@@ -759,8 +759,8 @@ export default function App() {
         <View style={styles.modalOverlay}>
           <View style={styles.statsModalContent}>
             <View style={styles.statsHeader}>
-              <Text style={styles.statsTitle}>Sleep Stats</Text>
-              <TouchableOpacity onPress={() => setStatsModalVisible(false)}>
+              <Text style={styles.statsTitle} accessibilityRole="header">Sleep Stats</Text>
+              <TouchableOpacity onPress={() => setStatsModalVisible(false)} accessibilityLabel="Close stats" accessibilityRole="button">
                 <Text style={styles.statsCloseButton}>Done</Text>
               </TouchableOpacity>
             </View>
@@ -799,7 +799,7 @@ export default function App() {
                                   {
                                     height: barHeight,
                                     backgroundColor: day.duration === 0
-                                      ? '#2A2A2A'
+                                      ? theme.surface
                                       : day.duration >= 420 // 7 hours
                                         ? '#4CAF50'
                                         : day.duration >= 360 // 6 hours

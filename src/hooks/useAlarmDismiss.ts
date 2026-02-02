@@ -183,7 +183,7 @@ export function useAlarmDismiss(
       return;
     }
 
-    const threshold = shakeThreshold || DEFAULT_SHAKE_THRESHOLD;
+    const threshold = shakeThreshold ?? DEFAULT_SHAKE_THRESHOLD;
 
     const subscription = Accelerometer.addListener(({ x, y, z }) => {
       const totalForce = Math.sqrt(x * x + y * y + z * z);

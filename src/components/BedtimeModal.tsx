@@ -6,6 +6,7 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import type { TimePickerProps } from './TimePicker';
+import { THEMES } from '../constants/themes';
 
 interface BedtimeModalProps {
   visible: boolean;
@@ -81,7 +82,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: THEMES.dark.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -90,18 +91,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
-    color: '#9999AA',
+    color: THEMES.dark.textMuted,
     textAlign: 'center',
     marginBottom: 16,
   },
   saveButton: {
-    backgroundColor: '#818CF8',
+    backgroundColor: THEMES.dark.accent,
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
@@ -110,7 +111,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
   },
   skipButton: {
     paddingVertical: 14,
@@ -119,6 +120,6 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     fontSize: 15,
-    color: '#9999AA',
+    color: THEMES.dark.textMuted,
   },
 });

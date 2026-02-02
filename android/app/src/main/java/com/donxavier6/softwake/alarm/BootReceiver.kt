@@ -16,9 +16,14 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        val validActions = setOf(
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_TIMEZONE_CHANGED,
+            Intent.ACTION_TIME_CHANGED
+        )
+        if (intent.action !in validActions) return
 
-        Log.d(TAG, "Device rebooted - rescheduling alarms from native store")
+        Log.d(TAG, "Received ${intent.action} - rescheduling alarms from native store")
 
         try {
             val prefs = context.getSharedPreferences("softwake_alarms_native", Context.MODE_PRIVATE)

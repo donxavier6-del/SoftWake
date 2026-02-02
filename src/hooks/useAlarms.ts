@@ -166,11 +166,11 @@ export function useAlarms(): UseAlarmsReturn {
     setSelectedDays([...alarm.days]);
     setSelectedLabel(alarm.label);
     setSelectedSnooze(alarm.snooze);
-    setSelectedWakeIntensity(alarm.wakeIntensity || 'energetic');
-    setSelectedSound(alarm.sound || 'sunrise');
+    setSelectedWakeIntensity(alarm.wakeIntensity ?? 'energetic');
+    setSelectedSound(alarm.sound ?? 'sunrise');
     const dismissType = (alarm.dismissType as string) === 'off'
       ? 'simple'
-      : (alarm.dismissType || 'simple');
+      : (alarm.dismissType ?? 'simple');
     setSelectedDismissType(dismissType as DismissType);
     setModalVisible(true);
   }, []);

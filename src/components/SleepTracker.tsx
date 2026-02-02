@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { THEMES } from '../constants/themes';
 
 // TimePicker props interface
 interface TimePickerProps {
@@ -60,11 +61,11 @@ export function SleepTracker({
             hapticFeedback={hapticFeedback}
           />
 
-          <TouchableOpacity style={styles.saveBedtimeButton} onPress={onSave}>
+          <TouchableOpacity style={styles.saveBedtimeButton} onPress={onSave} accessibilityLabel="Save bedtime" accessibilityRole="button">
             <Text style={styles.saveBedtimeButtonText}>Save</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.skipBedtimeButton} onPress={onSkip}>
+          <TouchableOpacity style={styles.skipBedtimeButton} onPress={onSkip} accessibilityLabel="Skip logging bedtime" accessibilityRole="button">
             <Text style={styles.skipBedtimeButtonText}>Skip</Text>
           </TouchableOpacity>
         </View>
@@ -80,7 +81,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   bedtimeModalContent: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: THEMES.dark.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -89,18 +90,18 @@ const styles = StyleSheet.create({
   bedtimeTitle: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
     textAlign: 'center',
     marginBottom: 8,
   },
   bedtimeSubtitle: {
     fontSize: 16,
-    color: '#666666',
+    color: THEMES.dark.textDisabled,
     textAlign: 'center',
     marginBottom: 24,
   },
   saveBedtimeButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: THEMES.dark.text,
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
   saveBedtimeButtonText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#0D0D0D',
+    color: THEMES.dark.background,
   },
   skipBedtimeButton: {
     paddingVertical: 16,
@@ -118,6 +119,6 @@ const styles = StyleSheet.create({
   },
   skipBedtimeButtonText: {
     fontSize: 16,
-    color: '#666666',
+    color: THEMES.dark.textDisabled,
   },
 });

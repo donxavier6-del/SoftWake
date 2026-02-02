@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { formatTimeWithPeriod } from '../utils/timeFormatting';
+import { THEMES } from '../constants/themes';
 
 interface OptimalWakeTime {
   hour: number;
@@ -80,7 +81,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   insightContent: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: THEMES.dark.card,
     borderRadius: 24,
     padding: 24,
     width: '100%',
@@ -89,28 +90,28 @@ const styles = StyleSheet.create({
   insightTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
     marginBottom: 20,
   },
   insightText: {
     fontSize: 16,
-    color: '#999999',
+    color: THEMES.dark.textMuted,
     textAlign: 'center',
     marginBottom: 12,
     lineHeight: 24,
   },
   insightHighlight: {
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
     fontWeight: '600',
   },
   insightTime: {
     fontSize: 48,
     fontWeight: '300',
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
     marginVertical: 20,
   },
   insightButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: THEMES.dark.text,
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 32,
@@ -119,7 +120,7 @@ const styles = StyleSheet.create({
   insightButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0D0D0D',
+    color: THEMES.dark.background,
   },
   insightDismiss: {
     paddingVertical: 16,
@@ -127,6 +128,6 @@ const styles = StyleSheet.create({
   },
   insightDismissText: {
     fontSize: 16,
-    color: '#666666',
+    color: THEMES.dark.textDisabled,
   },
 });

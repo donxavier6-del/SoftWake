@@ -6,6 +6,7 @@
 import React from 'react';
 import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import type { SleepEntry, Settings, Theme, SleepStatsResult, WeeklyDataPoint } from '../types';
+import { THEMES } from '../constants/themes';
 
 interface InsightsChartProps {
   sleepData: SleepEntry[];
@@ -23,8 +24,8 @@ export function InsightsChart({
   getSleepStats,
 }: InsightsChartProps) {
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <Text style={[styles.title, { color: theme.text }]}>Sleep Insights</Text>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} accessibilityLabel="Sleep insights">
+      <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">Sleep Insights</Text>
 
       {sleepData.length === 0 ? (
         /* Empty State */
@@ -44,7 +45,7 @@ export function InsightsChart({
               {getWeeklyData().map((d, i) => {
                 const hrs = d.duration / 60;
                 return (
-                  <View key={i} style={styles.barCol}>
+                  <View key={i} style={styles.barCol} accessibilityLabel={`${d.day}, ${hrs > 0 ? `${hrs.toFixed(1)} hours` : 'no data'}`}>
                     <View style={[styles.barTrack, { backgroundColor: theme.surface }]}>
                       <View style={[styles.bar, { height: `${(hrs / 10) * 100}%`, backgroundColor: hrs > 0 ? theme.accent : theme.surface }]} />
                     </View>
@@ -57,7 +58,7 @@ export function InsightsChart({
 
           {/* Stats Row */}
           <View style={styles.statsRow}>
-            <View style={[styles.statBox, { backgroundColor: theme.card }]}>
+            <View style={[styles.statBox, { backgroundColor: theme.card }]} accessibilityLabel={`Average sleep: ${(() => { const stats = getSleepStats(); if (!stats) return 'no data'; const hrs = Math.floor(stats.average / 60); const mins = stats.average % 60; return `${hrs} hours ${mins} minutes`; })()}`}>
               <Text style={[styles.statValue, { color: theme.text }]}>
                 {(() => {
                   const stats = getSleepStats();
@@ -69,7 +70,7 @@ export function InsightsChart({
               </Text>
               <Text style={[styles.statLabel, { color: theme.textMuted }]}>Avg Sleep</Text>
             </View>
-            <View style={[styles.statBox, { backgroundColor: theme.card }]}>
+            <View style={[styles.statBox, { backgroundColor: theme.card }]} accessibilityLabel={`Sleep goal: ${settings.sleepGoalHours} hours`}>
               <Text style={[styles.statValue, { color: theme.text }]}>{settings.sleepGoalHours} hrs</Text>
               <Text style={[styles.statLabel, { color: theme.textMuted }]}>Sleep Goal</Text>
             </View>
@@ -188,7 +189,7 @@ const styles = StyleSheet.create({
   tipLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
+    color: THEMES.dark.textMuted,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
   tipText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
     lineHeight: 22,
   },
 });

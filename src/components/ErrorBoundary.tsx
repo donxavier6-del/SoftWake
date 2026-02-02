@@ -50,7 +50,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <Text style={styles.message}>
             The app encountered an unexpected error. Please try again.
           </Text>
-          <TouchableOpacity style={styles.button} onPress={this.handleReset}>
+          <TouchableOpacity style={styles.button} onPress={this.handleReset} accessibilityLabel="Try again" accessibilityRole="button">
             <Text style={styles.buttonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
