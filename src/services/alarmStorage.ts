@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { nativeAlarm, generateAlarmId } from './nativeAlarm';
+import { safeJsonParse } from '../utils/safeJsonParse';
+import { logger } from '../utils/logger';
 
 const STORAGE_KEY = 'softwake_scheduled_alarms';
 
@@ -35,7 +37,8 @@ export const saveAndScheduleAlarm = async (
 
 export const getStoredAlarms = async (): Promise<StoredAlarm[]> => {
   const data = await AsyncStorage.getItem(STORAGE_KEY);
-  return data ? JSON.parse(data) : [];
+  // GAP-07: Safe JSON parse
+  return data ? safeJsonParse<StoredAlarm[]>(data, []) : [];
 };
 
 export const removeAlarm = async (id: string): Promise<void> => {
@@ -57,7 +60,7 @@ export const rescheduleAllAlarms = async (): Promise<void> => {
         await nativeAlarm.scheduleAlarm(alarm.id, alarm.timestamp, alarm.soundName);
         validAlarms.push(alarm);
       } catch (error) {
-        console.error(`Failed to reschedule alarm ${alarm.id}:`, error);
+        logger.error(`Failed to reschedule alarm ${alarm.id}:`, error);
       }
     }
   }

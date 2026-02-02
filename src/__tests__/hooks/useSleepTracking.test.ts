@@ -248,16 +248,19 @@ describe('useSleepTracking', () => {
     });
 
     it('should calculate average bedtime and wake time', async () => {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const today = new Date();
       const mockData: SleepEntry[] = [
         createSleepEntryWithTimestamps(
           '1',
-          new Date().setHours(22, 0, 0, 0), // 10:00 PM bedtime
-          new Date().setHours(7, 0, 0, 0) // 7:00 AM wake
+          new Date(yesterday).setHours(22, 0, 0, 0), // 10:00 PM yesterday
+          new Date(today).setHours(7, 0, 0, 0) // 7:00 AM today
         ),
         createSleepEntryWithTimestamps(
           '2',
-          new Date().setHours(23, 0, 0, 0), // 11:00 PM bedtime
-          new Date().setHours(7, 0, 0, 0) // 7:00 AM wake
+          new Date(yesterday).setHours(23, 0, 0, 0), // 11:00 PM yesterday
+          new Date(today).setHours(7, 0, 0, 0) // 7:00 AM today
         ),
       ];
       await AsyncStorage.setItem('@softwake_sleep_data', JSON.stringify(mockData));
@@ -563,15 +566,13 @@ describe('useSleepTracking', () => {
         result.current.handleSaveBedtime();
       });
 
-      // Wait for persistence
+      // Wait for debounced persistence (500ms debounce)
       await waitFor(async () => {
         const stored = await AsyncStorage.getItem('@softwake_sleep_data');
-        return stored !== null;
-      });
-
-      const stored = await AsyncStorage.getItem('@softwake_sleep_data');
-      const parsed = JSON.parse(stored!);
-      expect(parsed).toHaveLength(1);
+        expect(stored).not.toBeNull();
+        const parsed = JSON.parse(stored!);
+        expect(parsed).toHaveLength(1);
+      }, { timeout: 3000 });
     });
 
     it('should load saved data on re-mount', async () => {

@@ -50,7 +50,7 @@ class AlarmService : Service() {
                 PowerManager.PARTIAL_WAKE_LOCK,
                 "SoftWake::AlarmWakeLock"
             ).apply {
-                acquire(15 * 60 * 1000L)
+                acquire(30 * 60 * 1000L) // GAP-18: Extended to 30 minutes for longer alarm sessions
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to acquire wake lock", e)

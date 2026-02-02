@@ -39,6 +39,8 @@ export function MorningTab({ theme, hapticFeedback }: MorningTabProps) {
           <TouchableOpacity
             style={[styles.morningButton, { backgroundColor: theme.card }]}
             onPress={handleDeepBreath}
+            accessibilityLabel="Deep breath exercise"
+            accessibilityRole="button"
           >
             <Text style={styles.morningButtonIcon}>🌬️</Text>
             <Text style={[styles.morningButtonLabel, { color: theme.text }]}>Deep Breath</Text>
@@ -46,6 +48,8 @@ export function MorningTab({ theme, hapticFeedback }: MorningTabProps) {
           <TouchableOpacity
             style={[styles.morningButton, { backgroundColor: theme.card }]}
             onPress={handleSetIntention}
+            accessibilityLabel="Set daily intention"
+            accessibilityRole="button"
           >
             <Text style={styles.morningButtonIcon}>🎯</Text>
             <Text style={[styles.morningButtonLabel, { color: theme.text }]}>Set Intention</Text>

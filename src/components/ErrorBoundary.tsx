@@ -5,6 +5,8 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { logger } from '../utils/logger';
+import { THEMES } from '../constants/themes';
 
 interface Props {
   children: ReactNode;
@@ -27,9 +29,8 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to console in development
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    // In production, you would send this to an error tracking service like Sentry
+    // GAP-34: Use logger instead of console.error
+    logger.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
   handleReset = () => {
@@ -65,7 +66,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0a0a',
+    backgroundColor: THEMES.dark.background,
     padding: 20,
   },
   emoji: {
@@ -75,24 +76,24 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
     marginBottom: 12,
   },
   message: {
     fontSize: 16,
-    color: '#9999AA',
+    color: THEMES.dark.textMuted,
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22,
   },
   button: {
-    backgroundColor: '#818CF8',
+    backgroundColor: THEMES.dark.accent,
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 12,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: THEMES.dark.text,
     fontSize: 16,
     fontWeight: '600',
   },

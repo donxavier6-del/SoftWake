@@ -142,6 +142,8 @@ export function AlarmsTab({
       <TouchableOpacity
         style={[styles.addButton, { backgroundColor: theme.accent }]}
         onPress={onAddAlarm}
+        accessibilityLabel="Add new alarm"
+        accessibilityRole="button"
       >
         <Text style={styles.addButtonText}>+</Text>
       </TouchableOpacity>
@@ -150,7 +152,7 @@ export function AlarmsTab({
       {showUndoToast && (
         <View style={styles.undoToast}>
           <Text style={styles.undoToastText}>Alarm deleted</Text>
-          <TouchableOpacity onPress={onUndoDelete}>
+          <TouchableOpacity onPress={onUndoDelete} accessibilityLabel="Undo delete" accessibilityRole="button">
             <Text style={styles.undoButton}>Undo</Text>
           </TouchableOpacity>
         </View>

@@ -1,13 +1,15 @@
 /**
  * useSettings Hook
- *
  * Manages app settings state with AsyncStorage persistence.
- * Handles loading settings on mount and saving changes automatically.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Settings } from '../types';
+import { safeJsonParse } from '../utils/safeJsonParse';
+import { validateSettings } from '../utils/validation';
+import { logger } from '../utils/logger';
 
 const STORAGE_KEY = '@softwake_settings';
 
@@ -21,6 +23,7 @@ const DEFAULT_SETTINGS: Settings = {
   sleepGoalHours: 8,
   darkMode: true,
   hapticFeedback: true,
+  shakeThreshold: 1.5,
 };
 
 interface UseSettingsReturn {
@@ -33,17 +36,23 @@ export function useSettings(): UseSettingsReturn {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
 
+  // GAP-32: Track save error to avoid spamming
+  const saveErrorShownRef = useRef<boolean>(false);
+
   // Load settings from AsyncStorage on mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         if (stored) {
-          const parsed = JSON.parse(stored);
-          setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+          // GAP-07: Safe JSON parse
+          const parsed = safeJsonParse(stored, null);
+          // GAP-24: Validate settings with defaults for missing/invalid fields
+          const validated = validateSettings(parsed);
+          setSettings(validated);
         }
       } catch (error) {
-        console.log('Error loading settings:', error);
+        logger.log('Error loading settings:', error);
       } finally {
         setIsLoading(false);
       }
@@ -51,13 +60,22 @@ export function useSettings(): UseSettingsReturn {
     loadSettings();
   }, []);
 
-  // Save settings to AsyncStorage when they change
+  // GAP-15: Debounced save settings to AsyncStorage when they change
   useEffect(() => {
-    if (!isLoading) {
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(settings)).catch(
-        (error) => console.log('Error saving settings:', error)
-      );
-    }
+    if (isLoading) return;
+    const timer = setTimeout(async () => {
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      } catch (error) {
+        logger.log('Error saving settings:', error);
+        // GAP-32: Show user-facing error (once per session)
+        if (!saveErrorShownRef.current) {
+          saveErrorShownRef.current = true;
+          Alert.alert('Save Failed', 'Your settings couldn\'t be saved. Please free up storage space.');
+        }
+      }
+    }, 500);
+    return () => clearTimeout(timer);
   }, [settings, isLoading]);
 
   const updateSettings = (partial: Partial<Settings>) => {

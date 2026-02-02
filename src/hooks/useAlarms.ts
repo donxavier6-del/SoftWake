@@ -1,19 +1,16 @@
 /**
  * useAlarms hook - Manages alarm state and operations
- *
- * Extracted from App.tsx as part of the refactoring initiative.
- * This hook handles:
- * - Alarm list state
- * - Alarm editor modal state
- * - AsyncStorage persistence
- * - CRUD operations (Create, Read, Update, Delete)
- * - Undo delete functionality
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import type { Alarm, AlarmSound, DismissType, WakeIntensity } from '../types';
+import { safeJsonParse } from '../utils/safeJsonParse';
+import { validateAlarm, clampHour, clampMinute } from '../utils/validation';
+import { generateAlarmId } from '../services/nativeAlarm';
+import { logger } from '../utils/logger';
 
 const STORAGE_KEY = '@softwake_alarms';
 
@@ -90,16 +87,25 @@ export function useAlarms(): UseAlarmsReturn {
   const [showUndoToast, setShowUndoToast] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // GAP-32: Track save error to avoid spamming alerts
+  const saveErrorShownRef = useRef<boolean>(false);
+
   // Load alarms from storage on mount
   useEffect(() => {
     const loadAlarms = async () => {
       try {
         const storedAlarms = await AsyncStorage.getItem(STORAGE_KEY);
         if (storedAlarms) {
-          setAlarms(JSON.parse(storedAlarms));
+          // GAP-07: Safe JSON parse with fallback
+          const parsed = safeJsonParse<any[]>(storedAlarms, []);
+          // GAP-08: Validate each alarm
+          const validAlarms = parsed
+            .map((a: any) => validateAlarm(a))
+            .filter((a): a is Alarm => a != null);
+          setAlarms(validAlarms);
         }
       } catch (error) {
-        console.log('Error loading alarms:', error);
+        logger.log('Error loading alarms:', error);
       } finally {
         setIsLoaded(true);
       }
@@ -107,17 +113,22 @@ export function useAlarms(): UseAlarmsReturn {
     loadAlarms();
   }, []);
 
-  // Save alarms to storage whenever they change
+  // GAP-15: Debounced save to storage when alarms change
   useEffect(() => {
     if (!isLoaded) return;
-    const saveAlarms = async () => {
+    const timer = setTimeout(async () => {
       try {
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(alarms));
       } catch (error) {
-        console.log('Error saving alarms:', error);
+        logger.log('Error saving alarms:', error);
+        // GAP-32: Show user-facing error on save failure (once per session)
+        if (!saveErrorShownRef.current) {
+          saveErrorShownRef.current = true;
+          Alert.alert('Save Failed', 'Your alarm changes couldn\'t be saved. Please free up storage space.');
+        }
       }
-    };
-    saveAlarms();
+    }, 500);
+    return () => clearTimeout(timer);
   }, [alarms, isLoaded]);
 
   // Cleanup undo timer on unmount
@@ -129,9 +140,6 @@ export function useAlarms(): UseAlarmsReturn {
     };
   }, []);
 
-  /**
-   * Open the alarm editor to add a new alarm
-   */
   const handleAddAlarm = useCallback((
     defaultSettings?: {
       defaultWakeIntensity: WakeIntensity;
@@ -151,9 +159,6 @@ export function useAlarms(): UseAlarmsReturn {
     setModalVisible(true);
   }, []);
 
-  /**
-   * Open the alarm editor to edit an existing alarm
-   */
   const handleEditAlarm = useCallback((alarm: Alarm) => {
     setEditingAlarmId(alarm.id);
     setSelectedHour(alarm.hour);
@@ -163,7 +168,6 @@ export function useAlarms(): UseAlarmsReturn {
     setSelectedSnooze(alarm.snooze);
     setSelectedWakeIntensity(alarm.wakeIntensity || 'energetic');
     setSelectedSound(alarm.sound || 'sunrise');
-    // Handle legacy 'off' value that may exist in storage
     const dismissType = (alarm.dismissType as string) === 'off'
       ? 'simple'
       : (alarm.dismissType || 'simple');
@@ -171,9 +175,6 @@ export function useAlarms(): UseAlarmsReturn {
     setModalVisible(true);
   }, []);
 
-  /**
-   * Toggle a day in the selected days array
-   */
   const toggleDay = useCallback((index: number) => {
     setSelectedDays((prevDays) => {
       const newDays = [...prevDays];
@@ -182,24 +183,23 @@ export function useAlarms(): UseAlarmsReturn {
     });
   }, []);
 
-  /**
-   * Save the current alarm (create new or update existing)
-   */
   const handleSaveAlarm = useCallback((onBeforeSave?: () => void) => {
-    // Optional callback for cleanup (e.g., stop preview sound)
     if (onBeforeSave) {
       onBeforeSave();
     }
 
+    // GAP-09: Validate hour/minute before saving
+    const validHour = clampHour(selectedHour);
+    const validMinute = clampMinute(selectedMinute);
+
     if (editingAlarmId) {
-      // Update existing alarm
       setAlarms((prevAlarms) =>
         prevAlarms.map((alarm) =>
           alarm.id === editingAlarmId
             ? {
                 ...alarm,
-                hour: selectedHour,
-                minute: selectedMinute,
+                hour: validHour,
+                minute: validMinute,
                 days: selectedDays,
                 label: selectedLabel,
                 snooze: selectedSnooze,
@@ -211,11 +211,11 @@ export function useAlarms(): UseAlarmsReturn {
         )
       );
     } else {
-      // Create new alarm
+      // GAP-22: Use generateAlarmId() instead of Date.now().toString()
       const newAlarm: Alarm = {
-        id: Date.now().toString(),
-        hour: selectedHour,
-        minute: selectedMinute,
+        id: generateAlarmId(),
+        hour: validHour,
+        minute: validMinute,
         days: selectedDays,
         enabled: true,
         label: selectedLabel,
@@ -240,9 +240,6 @@ export function useAlarms(): UseAlarmsReturn {
     selectedDismissType,
   ]);
 
-  /**
-   * Toggle alarm enabled/disabled state
-   */
   const toggleAlarm = useCallback((id: string) => {
     setAlarms((prevAlarms) =>
       prevAlarms.map((alarm) =>
@@ -251,38 +248,28 @@ export function useAlarms(): UseAlarmsReturn {
     );
   }, []);
 
-  /**
-   * Delete an alarm with undo capability
-   */
   const deleteAlarm = useCallback((id: string, hapticFeedback?: boolean) => {
     const alarmToDelete = alarms.find((alarm) => alarm.id === id);
     if (!alarmToDelete) return;
 
-    // Clear any existing undo timer
     if (undoTimerRef.current) {
       clearTimeout(undoTimerRef.current);
     }
 
-    // Store deleted alarm for undo
     setDeletedAlarm(alarmToDelete);
     setShowUndoToast(true);
     setAlarms((prevAlarms) => prevAlarms.filter((alarm) => alarm.id !== id));
 
-    // Haptic feedback
     if (hapticFeedback) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
-    // Auto-hide toast after 3 seconds
     undoTimerRef.current = setTimeout(() => {
       setShowUndoToast(false);
       setDeletedAlarm(null);
     }, 3000);
   }, [alarms]);
 
-  /**
-   * Undo the last delete operation
-   */
   const undoDelete = useCallback(() => {
     if (deletedAlarm) {
       setAlarms((prevAlarms) => [...prevAlarms, deletedAlarm]);
@@ -295,11 +282,8 @@ export function useAlarms(): UseAlarmsReturn {
   }, [deletedAlarm]);
 
   return {
-    // Alarm list
     alarms,
     setAlarms,
-
-    // Editor state
     modalVisible,
     setModalVisible,
     editingAlarmId,
@@ -320,20 +304,14 @@ export function useAlarms(): UseAlarmsReturn {
     setSelectedSound,
     selectedDismissType,
     setSelectedDismissType,
-
-    // Actions
     handleAddAlarm,
     handleEditAlarm,
     handleSaveAlarm,
     toggleAlarm,
     deleteAlarm,
     toggleDay,
-
-    // Undo
     showUndoToast,
     undoDelete,
-
-    // Loading state
     isLoaded,
   };
 }

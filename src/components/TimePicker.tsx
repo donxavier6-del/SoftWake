@@ -7,6 +7,7 @@ import React, { useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import WheelPicker from 'react-native-wheel-scrollview-picker';
 import * as Haptics from 'expo-haptics';
+import { clampHour } from '../utils/validation';
 
 export interface TimePickerProps {
   hour: number;          // 0-23 (24-hour format internally)
@@ -67,10 +68,11 @@ export function TimePicker({
     if (index !== lastAmPmRef.current) {
       lastAmPmRef.current = index;
       if (hapticFeedback) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // GAP-09: Clamp AM/PM hour conversions
       if (index === 0 && isPM) {
-        onHourChange(hour - 12);
+        onHourChange(clampHour(hour - 12));
       } else if (index === 1 && !isPM) {
-        onHourChange(hour + 12);
+        onHourChange(clampHour(hour + 12));
       }
     }
   };

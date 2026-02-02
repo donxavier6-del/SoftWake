@@ -12,6 +12,7 @@ import { useRef, useCallback, useState } from 'react';
 import { Audio } from 'expo-av';
 import { WAKE_INTENSITY_OPTIONS } from '../constants/options';
 import type { AlarmSound, WakeIntensity } from '../types';
+import { logger } from '../utils/logger';
 
 /**
  * Sound configuration for each alarm tone
@@ -129,7 +130,7 @@ export function useAlarmSound(): UseAlarmSoundReturn {
         await stopPreviewSound();
       }, 2000);
     } catch (error) {
-      console.log('Error playing preview:', error);
+      logger.log('Error playing preview:', error);
       isPreviewPlayingRef.current = false;
       setIsPlaying(false);
     }

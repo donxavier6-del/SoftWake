@@ -3,11 +3,15 @@
  * Manages sleep data, bedtime logging, and sleep statistics
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DAYS } from '../constants/options';
 import { formatTimeWithPeriod } from '../utils/timeFormatting';
 import type { SleepEntry } from '../types';
+import { safeJsonParse } from '../utils/safeJsonParse';
+import { validateSleepEntry } from '../utils/validation';
+import { logger } from '../utils/logger';
 
 const SLEEP_STORAGE_KEY = '@softwake_sleep_data';
 
@@ -55,6 +59,9 @@ export function useSleepTracking(): UseSleepTrackingReturn {
   const [sleepData, setSleepData] = useState<SleepEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // GAP-32: Track save error to avoid spamming
+  const saveErrorShownRef = useRef<boolean>(false);
+
   // Bedtime modal state
   const [bedtimeModalVisible, setBedtimeModalVisible] = useState(false);
   const [bedtimeHour, setBedtimeHour] = useState(22);
@@ -67,10 +74,16 @@ export function useSleepTracking(): UseSleepTrackingReturn {
       try {
         const storedSleep = await AsyncStorage.getItem(SLEEP_STORAGE_KEY);
         if (storedSleep) {
-          setSleepData(JSON.parse(storedSleep));
+          // GAP-07: Safe JSON parse
+          const parsed = safeJsonParse<any[]>(storedSleep, []);
+          // GAP-25: Validate each sleep entry
+          const validEntries = parsed
+            .map((e: any) => validateSleepEntry(e))
+            .filter((e): e is SleepEntry => e != null);
+          setSleepData(validEntries);
         }
       } catch (error) {
-        console.log('Error loading sleep data:', error);
+        logger.log('Error loading sleep data:', error);
       } finally {
         setIsLoading(false);
       }
@@ -78,17 +91,22 @@ export function useSleepTracking(): UseSleepTrackingReturn {
     loadSleepData();
   }, []);
 
-  // Save sleep data to storage when it changes
+  // GAP-15: Debounced save sleep data to storage when it changes
   useEffect(() => {
     if (isLoading) return;
-    const saveSleepData = async () => {
+    const timer = setTimeout(async () => {
       try {
         await AsyncStorage.setItem(SLEEP_STORAGE_KEY, JSON.stringify(sleepData));
       } catch (error) {
-        console.log('Error saving sleep data:', error);
+        logger.log('Error saving sleep data:', error);
+        // GAP-32: Show user-facing error on save failure (once per session)
+        if (!saveErrorShownRef.current) {
+          saveErrorShownRef.current = true;
+          Alert.alert('Save Failed', 'Your sleep data couldn\'t be saved. Please free up storage space.');
+        }
       }
-    };
-    saveSleepData();
+    }, 500);
+    return () => clearTimeout(timer);
   }, [sleepData, isLoading]);
 
   // Get weekly data for sleep chart
@@ -194,6 +212,9 @@ export function useSleepTracking(): UseSleepTrackingReturn {
 
     // Calculate sleep duration in minutes
     const sleepDuration = Math.round((wakeTime.getTime() - bedtime.getTime()) / (1000 * 60));
+
+    // GAP-14: Guard negative or extreme sleep duration
+    if (sleepDuration <= 0 || sleepDuration > 1440) return;
 
     const newEntry: SleepEntry = {
       id: Date.now().toString(),

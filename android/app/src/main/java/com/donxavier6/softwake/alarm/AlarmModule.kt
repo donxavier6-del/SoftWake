@@ -4,7 +4,10 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -136,6 +139,52 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
             promise.resolve(alarmId)
         } catch (e: Exception) {
             promise.resolve(null)
+        }
+    }
+
+    // GAP-06: Open exact alarm settings directly
+    @ReactMethod
+    fun openExactAlarmSettings(promise: Promise) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.parse("package:${reactContext.packageName}")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                reactContext.startActivity(intent)
+            } else {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:${reactContext.packageName}")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                reactContext.startActivity(intent)
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("SETTINGS_ERROR", e.message)
+        }
+    }
+
+    // GAP-10: Check battery optimization status
+    @ReactMethod
+    fun isIgnoringBatteryOptimizations(promise: Promise) {
+        try {
+            val powerManager = reactContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+            promise.resolve(powerManager.isIgnoringBatteryOptimizations(reactContext.packageName))
+        } catch (e: Exception) {
+            promise.resolve(true)
+        }
+    }
+
+    // GAP-01: Save alarms to native SharedPreferences for reboot rescheduling
+    @ReactMethod
+    fun saveAlarmsForReboot(alarmsJson: String, promise: Promise) {
+        try {
+            val prefs = reactContext.getSharedPreferences("softwake_alarms_native", Context.MODE_PRIVATE)
+            prefs.edit().putString("alarms", alarmsJson).apply()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("SAVE_ERROR", e.message)
         }
     }
 

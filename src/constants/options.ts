@@ -43,6 +43,20 @@ export const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export const AFFIRMATIONS = [
   'I am ready for today',
+  'Today is full of possibilities',
+  'I choose to be positive',
+  'I am grateful for this new day',
+  'I have the power to create change',
+  'My mind is clear and focused',
+  'I embrace the challenges ahead',
+  'I am worthy of good things',
+  'Today I will make progress',
+  'I am strong and capable',
+  'I welcome this beautiful morning',
+  'I am in charge of my happiness',
+  'Every day is a fresh start',
+  'I believe in my abilities',
+  'I radiate confidence and calm',
 ];
 
 export const SLEEP_GOAL_OPTIONS = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];

@@ -93,13 +93,9 @@ export function useAlarmTrigger(
       });
 
       if (matchingAlarms.length > 0) {
-        // GAP-02: Skip if an alarm is already active (triggerAlarm also guards,
-        // but this avoids unnecessary queue manipulation)
-        if (nativeAlarmFiredRef.current) {
-          return;
-        }
-
-        // GAP-03: Queue alarms and trigger only the first
+        // GAP-03: Queue alarms and trigger only the first.
+        // GAP-02: triggerAlarm() itself has a synchronous ref guard to prevent
+        // duplicate triggers from multiple sources (interval + notification).
         if (alarmQueueRef.current.length === 0 && !alarmScreenVisible) {
           alarmQueueRef.current = matchingAlarms.slice(1);
           triggerAlarm(matchingAlarms[0]);

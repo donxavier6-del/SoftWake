@@ -36,6 +36,7 @@ describe('useSettings', () => {
         sleepGoalHours: 8,
         darkMode: true,
         hapticFeedback: true,
+        shakeThreshold: 1.5,
       });
     });
 

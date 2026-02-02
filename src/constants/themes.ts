@@ -19,6 +19,12 @@ export const THEMES: { dark: Theme; light: Theme } = {
     accentAlt: '#6366F1',
     switchTrackOff: '#2A2A2A',
     switchThumbOff: '#666666',
+    // Premium UI tokens
+    cardGlass: 'rgba(255, 255, 255, 0.04)',
+    cardBorder: 'rgba(255, 255, 255, 0.08)',
+    accentGlow: 'rgba(129, 140, 248, 0.25)',
+    accentSoft: 'rgba(129, 140, 248, 0.12)',
+    divider: 'rgba(255, 255, 255, 0.06)',
   },
   light: {
     gradient: ['#f0f4ff', '#e8eeff', '#f5f7ff'] as const,
@@ -34,5 +40,11 @@ export const THEMES: { dark: Theme; light: Theme } = {
     accentAlt: '#818CF8',
     switchTrackOff: '#E5E5EA',
     switchThumbOff: '#FFFFFF',
+    // Premium UI tokens
+    cardGlass: 'rgba(255, 255, 255, 0.7)',
+    cardBorder: 'rgba(0, 0, 0, 0.06)',
+    accentGlow: 'rgba(99, 102, 241, 0.15)',
+    accentSoft: 'rgba(99, 102, 241, 0.08)',
+    divider: 'rgba(0, 0, 0, 0.06)',
   },
 };

@@ -17,7 +17,7 @@ import { AFFIRMATIONS } from '../constants/options';
 import { generateMathProblem } from '../utils/mathProblem';
 import type { MathProblem } from '../types';
 
-const SHAKE_THRESHOLD = 1.5;
+const DEFAULT_SHAKE_THRESHOLD = 1.5;
 const REQUIRED_SHAKES = 20;
 const BREATHING_CYCLES_REQUIRED = 3;
 
@@ -58,7 +58,8 @@ export interface UseAlarmDismissReturn {
 export function useAlarmDismiss(
   isActive: boolean,
   dismissType: string,
-  hapticFeedback: boolean
+  hapticFeedback: boolean,
+  shakeThreshold: number = DEFAULT_SHAKE_THRESHOLD
 ): UseAlarmDismissReturn {
   // === BREATHING EXERCISE STATE ===
   const [breathingPhase, setBreathingPhase] = useState<'inhale' | 'hold' | 'exhale' | 'complete'>('inhale');
@@ -103,18 +104,26 @@ export function useAlarmDismiss(
     // Start first inhale animation
     animateBreathingCircle(1.0, 4000);
 
+    const setBreathingTimer = (callback: () => void, delay: number) => {
+      // GAP-11: Clear previous timer before setting new one to prevent leaks
+      if (breathingTimerRef.current) {
+        clearTimeout(breathingTimerRef.current);
+      }
+      breathingTimerRef.current = setTimeout(callback, delay);
+    };
+
     const runPhase = () => {
       if (phase === 'inhale') {
         // Inhale done -> Hold (7 seconds, circle stays expanded)
         phase = 'hold';
         setBreathingPhase('hold');
-        breathingTimerRef.current = setTimeout(runPhase, 7000);
+        setBreathingTimer(runPhase, 7000);
       } else if (phase === 'hold') {
         // Hold done -> Exhale (8 seconds, circle contracts)
         phase = 'exhale';
         setBreathingPhase('exhale');
         animateBreathingCircle(0.4, 8000);
-        breathingTimerRef.current = setTimeout(runPhase, 8000);
+        setBreathingTimer(runPhase, 8000);
       } else if (phase === 'exhale') {
         // Exhale done -> next cycle or complete
         cycle++;
@@ -123,7 +132,7 @@ export function useAlarmDismiss(
           phase = 'complete';
           setBreathingPhase('complete');
           // Auto-dismiss after showing "Good morning" for 2.5 seconds
-          breathingTimerRef.current = setTimeout(() => {
+          setBreathingTimer(() => {
             // Signal completion - parent should handle dismissal
           }, 2500);
         } else {
@@ -131,13 +140,13 @@ export function useAlarmDismiss(
           phase = 'inhale';
           setBreathingPhase('inhale');
           animateBreathingCircle(1.0, 4000);
-          breathingTimerRef.current = setTimeout(runPhase, 4000);
+          setBreathingTimer(runPhase, 4000);
         }
       }
     };
 
     // First inhale: 4 seconds
-    breathingTimerRef.current = setTimeout(runPhase, 4000);
+    setBreathingTimer(runPhase, 4000);
   }, [animateBreathingCircle, breathingAnim]);
 
   const resetBreathing = useCallback(() => {
@@ -168,16 +177,19 @@ export function useAlarmDismiss(
   }, [isActive]);
 
   // === SHAKE DETECTION LOGIC ===
+  // GAP-26: Clean up accelerometer when not active; GAP-29: Use configurable threshold
   useEffect(() => {
     if (!isActive || dismissType !== 'shake') {
       return;
     }
 
+    const threshold = shakeThreshold || DEFAULT_SHAKE_THRESHOLD;
+
     const subscription = Accelerometer.addListener(({ x, y, z }) => {
       const totalForce = Math.sqrt(x * x + y * y + z * z);
       const now = Date.now();
 
-      if (totalForce > SHAKE_THRESHOLD && now - lastShakeTime.current > 300) {
+      if (totalForce > threshold && now - lastShakeTime.current > 300) {
         lastShakeTime.current = now;
         setShakeCount((prev) => {
           if (prev >= REQUIRED_SHAKES) return prev;
@@ -195,7 +207,7 @@ export function useAlarmDismiss(
     return () => {
       subscription.remove();
     };
-  }, [isActive, dismissType]);
+  }, [isActive, dismissType, shakeThreshold]);
 
   const resetShake = useCallback(() => {
     setShakeCount(0);

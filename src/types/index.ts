@@ -42,6 +42,7 @@ export type Settings = {
   sleepGoalHours: number;
   darkMode: boolean;
   hapticFeedback: boolean;
+  shakeThreshold: number; // GAP-29: Configurable shake sensitivity (1.0-3.0)
 };
 
 // Theme type based on THEMES object
@@ -59,6 +60,12 @@ export type Theme = {
   accentAlt: string;
   switchTrackOff?: string;
   switchThumbOff?: string;
+  // Premium UI tokens
+  cardGlass: string;
+  cardBorder: string;
+  accentGlow: string;
+  accentSoft: string;
+  divider: string;
 };
 
 // Return type for getSleepStats function

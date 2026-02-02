@@ -7,6 +7,7 @@ import React from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Switch, StyleSheet } from 'react-native';
 import { PanGestureHandler, HandlerStateChangeEvent } from 'react-native-gesture-handler';
 import { DAYS } from '../constants/options';
+import { FONTS } from '../constants/fonts';
 import type { Alarm, Theme } from '../types';
 
 interface AlarmsListProps {
@@ -66,11 +67,19 @@ export function AlarmsList({
           activeOffsetX={[-20, 20]}
           activeOffsetY={[-20, 20]}
         >
-          <View style={[styles.alarmItem, { backgroundColor: theme.card }]}>
+          <View style={[
+            styles.alarmItem,
+            {
+              backgroundColor: theme.cardGlass,
+              borderColor: theme.cardBorder,
+            },
+          ]}>
             <TouchableOpacity
               style={styles.alarmInfo}
               onPress={() => onEditAlarm(alarm)}
               activeOpacity={0.7}
+              accessibilityLabel={`Edit alarm at ${formatAlarmTime(alarm.hour, alarm.minute)}${alarm.label ? `, ${alarm.label}` : ''}`}
+              accessibilityRole="button"
             >
               <Text style={[
                 styles.alarmTime,
@@ -85,7 +94,7 @@ export function AlarmsList({
                 !alarm.enabled && { color: theme.textDisabled },
               ]}>
                 {alarm.label ? `${alarm.label} · ` : ''}{getRepeatText(alarm.days)}
-                {alarm.wakeIntensity && alarm.wakeIntensity !== 'energetic' ? ` · ${alarm.wakeIntensity.charAt(0).toUpperCase() + alarm.wakeIntensity.slice(1)}` : ''}
+                {alarm.wakeIntensity != null && alarm.wakeIntensity !== 'energetic' ? ` · ${alarm.wakeIntensity.charAt(0).toUpperCase() + alarm.wakeIntensity.slice(1)}` : ''}
               </Text>
             </TouchableOpacity>
             <Switch
@@ -93,6 +102,8 @@ export function AlarmsList({
               onValueChange={() => onToggleAlarm(alarm.id)}
               trackColor={{ false: theme.switchTrackOff, true: theme.accent }}
               thumbColor={alarm.enabled ? '#FFFFFF' : theme.switchThumbOff}
+              accessibilityLabel={`${alarm.enabled ? 'Disable' : 'Enable'} alarm at ${formatAlarmTime(alarm.hour, alarm.minute)}`}
+              accessibilityRole="switch"
             />
           </View>
         </PanGestureHandler>
@@ -111,24 +122,28 @@ const styles = StyleSheet.create({
   noAlarmsText: {
     textAlign: 'center',
     fontSize: 16,
+    fontFamily: FONTS.regular,
     marginTop: 20,
   },
   alarmItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
+    padding: 18,
+    borderRadius: 20,
     marginBottom: 12,
+    borderWidth: 1,
   },
   alarmInfo: {
     flex: 1,
   },
   alarmTime: {
-    fontSize: 24,
-    fontWeight: '600',
+    fontSize: 28,
+    fontFamily: FONTS.light,
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
   alarmDays: {
     fontSize: 14,
+    fontFamily: FONTS.regular,
   },
 });

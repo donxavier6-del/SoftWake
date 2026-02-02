@@ -184,6 +184,9 @@ export function AlarmScreen({
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoFocus
+                contextMenuHidden={true}
+                accessibilityLabel="Type the affirmation to dismiss alarm"
+                accessibilityRole="text"
               />
             </View>
           )}
@@ -241,10 +244,14 @@ export function AlarmScreen({
                 placeholder="Your answer"
                 placeholderTextColor="rgba(255, 255, 255, 0.3)"
                 autoFocus
+                accessibilityLabel="Enter math answer"
+                accessibilityRole="text"
               />
               <TouchableOpacity
                 style={styles.mathSubmitButton}
                 onPress={onMathSubmit}
+                accessibilityLabel="Submit answer"
+                accessibilityRole="button"
               >
                 <Text style={styles.mathSubmitButtonText}>Submit</Text>
               </TouchableOpacity>
@@ -263,14 +270,18 @@ export function AlarmScreen({
             <TouchableOpacity
               style={styles.stopButton}
               onPress={onSimpleDismiss}
+              accessibilityLabel="Stop alarm"
+              accessibilityRole="button"
             >
               <Text style={styles.stopButtonText}>Stop</Text>
             </TouchableOpacity>
           </View>
-          {activeAlarm && activeAlarm.snooze > 0 && (
+          {activeAlarm?.snooze != null && activeAlarm.snooze > 0 && (
             <TouchableOpacity
               style={styles.snoozeButton}
               onPress={onSnooze}
+              accessibilityLabel={`Snooze alarm for ${activeAlarm.snooze} minutes`}
+              accessibilityRole="button"
             >
               <Text style={styles.snoozeButtonText}>
                 Snooze ({activeAlarm.snooze} min)

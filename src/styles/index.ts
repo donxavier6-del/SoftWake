@@ -1,4 +1,5 @@
 import { Platform, StyleSheet } from 'react-native';
+import { FONTS } from '../constants/fonts';
 
 export const styles = StyleSheet.create({
   container: {
@@ -13,18 +14,19 @@ export const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 96,
-    fontWeight: '200',
+    fontFamily: FONTS.thin,
     color: '#FFFFFF',
     letterSpacing: -4,
   },
   ampmText: {
     fontSize: 24,
-    fontWeight: '400',
+    fontFamily: FONTS.regular,
     color: '#666666',
     marginLeft: 8,
   },
   dateText: {
     fontSize: 18,
+    fontFamily: FONTS.regular,
     color: '#666666',
     textAlign: 'center',
     marginTop: 8,
@@ -44,7 +46,7 @@ export const styles = StyleSheet.create({
   },
   countdownText: {
     fontSize: 15,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: '#9999AA',
     letterSpacing: 0.3,
   },
@@ -58,7 +60,7 @@ export const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#666666',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -67,6 +69,7 @@ export const styles = StyleSheet.create({
   },
   noAlarmsText: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#444444',
     paddingHorizontal: 24,
   },
@@ -88,7 +91,7 @@ export const styles = StyleSheet.create({
   },
   alarmTime: {
     fontSize: 32,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: '#FFFFFF',
     textAlign: 'left',
   },
@@ -97,6 +100,7 @@ export const styles = StyleSheet.create({
   },
   alarmDays: {
     fontSize: 14,
+    fontFamily: FONTS.regular,
     color: '#666666',
     marginTop: 4,
   },
@@ -125,12 +129,12 @@ export const styles = StyleSheet.create({
   undoToastText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '500',
+    fontFamily: FONTS.medium,
   },
   undoButton: {
     color: '#818CF8',
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     textTransform: 'uppercase',
   },
   tabContent: {
@@ -156,7 +160,7 @@ export const styles = StyleSheet.create({
   },
   addButtonText: {
     fontSize: 28,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: '#FFFFFF',
     marginTop: -2,
   },
@@ -183,13 +187,13 @@ export const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: '500',
+    fontFamily: FONTS.medium,
     color: '#555555',
     letterSpacing: 0.2,
   },
   tabLabelActive: {
     color: '#818CF8',
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
   },
   placeholderScreen: {
     flex: 1,
@@ -204,12 +208,13 @@ export const styles = StyleSheet.create({
   },
   placeholderTitle: {
     fontSize: 22,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
     marginBottom: 10,
   },
   placeholderSubtitle: {
     fontSize: 15,
+    fontFamily: FONTS.regular,
     color: '#555555',
     textAlign: 'center',
     lineHeight: 22,
@@ -222,12 +227,13 @@ export const styles = StyleSheet.create({
   },
   morningGreeting: {
     fontSize: 32,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     color: '#FFFFFF',
     marginBottom: 12,
   },
   morningQuote: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#9999AA',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -253,7 +259,7 @@ export const styles = StyleSheet.create({
   },
   morningButtonLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#818CF8',
   },
   modalOverlay: {
@@ -280,16 +286,17 @@ export const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
   },
   cancelButton: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#666666',
   },
   saveButton: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#818CF8',
   },
   repeatSection: {
@@ -298,7 +305,7 @@ export const styles = StyleSheet.create({
   },
   repeatLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#666666',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -321,7 +328,7 @@ export const styles = StyleSheet.create({
   },
   dayText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#666666',
   },
   dayTextSelected: {
@@ -333,7 +340,7 @@ export const styles = StyleSheet.create({
   },
   labelTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#666666',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -345,6 +352,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#FFFFFF',
   },
   snoozeSection: {
@@ -353,7 +361,7 @@ export const styles = StyleSheet.create({
   },
   snoozeTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#666666',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -374,7 +382,7 @@ export const styles = StyleSheet.create({
   },
   snoozeOptionText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: FONTS.medium,
     color: '#666666',
   },
   snoozeOptionTextSelected: {
@@ -392,7 +400,7 @@ export const styles = StyleSheet.create({
   },
   wakeIntensityTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#666666',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -424,7 +432,7 @@ export const styles = StyleSheet.create({
   },
   wakeIntensityOptionText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: FONTS.medium,
     color: '#666666',
   },
   wakeIntensityOptionTextSelected: {
@@ -437,7 +445,7 @@ export const styles = StyleSheet.create({
   },
   soundTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#666666',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -465,7 +473,7 @@ export const styles = StyleSheet.create({
   },
   soundOptionText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: FONTS.medium,
     color: '#666666',
   },
   soundOptionTextSelected: {
@@ -478,7 +486,7 @@ export const styles = StyleSheet.create({
   },
   dismissTypeTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#666666',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -506,7 +514,7 @@ export const styles = StyleSheet.create({
   },
   dismissTypeLabel: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
     marginBottom: 4,
   },
@@ -515,6 +523,7 @@ export const styles = StyleSheet.create({
   },
   dismissTypeDescription: {
     fontSize: 13,
+    fontFamily: FONTS.regular,
     color: '#666666',
   },
   dismissTypeDescriptionSelected: {
@@ -522,13 +531,14 @@ export const styles = StyleSheet.create({
   },
   missionsSubtitle: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#818CF8',
     marginTop: 16,
     marginBottom: 4,
   },
   missionsHint: {
     fontSize: 12,
+    fontFamily: FONTS.regular,
     color: '#555555',
     marginBottom: 12,
   },
@@ -542,12 +552,13 @@ export const styles = StyleSheet.create({
   },
   alarmScreenTime: {
     fontSize: 72,
-    fontWeight: '200',
+    fontFamily: FONTS.thin,
     color: '#FFFFFF',
     marginBottom: 8,
   },
   alarmScreenLabel: {
     fontSize: 24,
+    fontFamily: FONTS.light,
     color: '#666666',
     marginBottom: 60,
   },
@@ -563,14 +574,14 @@ export const styles = StyleSheet.create({
   },
   mathPrompt: {
     fontSize: 18,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: 'rgba(255, 255, 255, 0.6)',
     marginBottom: 32,
     letterSpacing: 0.5,
   },
   mathProblemText: {
     fontSize: 48,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: '#FFFFFF',
     marginBottom: 40,
   },
@@ -581,6 +592,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 18,
     fontSize: 32,
+    fontFamily: FONTS.light,
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 24,
@@ -602,7 +614,7 @@ export const styles = StyleSheet.create({
   },
   mathSubmitButtonText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
   },
   mathCompleteContainer: {
@@ -611,7 +623,7 @@ export const styles = StyleSheet.create({
   },
   mathCompleteText: {
     fontSize: 32,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: '#4ADE80',
     letterSpacing: 1,
   },
@@ -627,7 +639,7 @@ export const styles = StyleSheet.create({
   },
   shakePrompt: {
     fontSize: 18,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: 'rgba(255, 255, 255, 0.6)',
     marginBottom: 40,
     letterSpacing: 0.5,
@@ -656,8 +668,8 @@ export const styles = StyleSheet.create({
   },
   shakeProgressText: {
     fontSize: 18,
+    fontFamily: FONTS.medium,
     color: 'rgba(255, 255, 255, 0.5)',
-    fontWeight: '500',
   },
   shakeCompleteContainer: {
     alignItems: 'center',
@@ -665,7 +677,7 @@ export const styles = StyleSheet.create({
   },
   shakeCompleteText: {
     fontSize: 32,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: '#4ADE80',
     letterSpacing: 1,
   },
@@ -689,7 +701,7 @@ export const styles = StyleSheet.create({
   },
   stopButtonText: {
     fontSize: 32,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     color: '#FFFFFF',
     letterSpacing: 2,
   },
@@ -707,7 +719,7 @@ export const styles = StyleSheet.create({
   },
   breathingTimeText: {
     fontSize: 48,
-    fontWeight: '200',
+    fontFamily: FONTS.thin,
     color: 'rgba(255, 255, 255, 0.6)',
     marginBottom: 40,
   },
@@ -733,17 +745,18 @@ export const styles = StyleSheet.create({
   },
   breathingPhaseLabel: {
     fontSize: 24,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
     marginBottom: 8,
   },
   breathingPhaseDuration: {
     fontSize: 14,
+    fontFamily: FONTS.regular,
     color: 'rgba(255, 255, 255, 0.5)',
   },
   breathingCycleProgress: {
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: FONTS.medium,
     color: 'rgba(255, 255, 255, 0.5)',
   },
   breathingCompleteContainer: {
@@ -753,12 +766,13 @@ export const styles = StyleSheet.create({
   },
   breathingGoodMorning: {
     fontSize: 36,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: '#FFFFFF',
     marginBottom: 12,
   },
   breathingCompleteLabel: {
     fontSize: 18,
+    fontFamily: FONTS.regular,
     color: 'rgba(255, 255, 255, 0.6)',
   },
   affirmationScreen: {
@@ -773,7 +787,7 @@ export const styles = StyleSheet.create({
   },
   affirmationPrompt: {
     fontSize: 18,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: 'rgba(255, 255, 255, 0.6)',
     marginBottom: 32,
     letterSpacing: 0.5,
@@ -791,7 +805,7 @@ export const styles = StyleSheet.create({
   },
   affirmationChar: {
     fontSize: 28,
-    fontWeight: '500',
+    fontFamily: FONTS.medium,
     color: 'rgba(255, 255, 255, 0.4)',
     letterSpacing: 1,
   },
@@ -808,6 +822,7 @@ export const styles = StyleSheet.create({
     paddingVertical: 18,
     paddingHorizontal: 20,
     fontSize: 18,
+    fontFamily: FONTS.regular,
     color: '#FFFFFF',
     textAlign: 'center',
     borderWidth: 1,
@@ -819,7 +834,7 @@ export const styles = StyleSheet.create({
   },
   affirmationWellDone: {
     fontSize: 32,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: '#4ADE80',
     letterSpacing: 1,
   },
@@ -830,6 +845,7 @@ export const styles = StyleSheet.create({
   },
   snoozeButtonText: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#666666',
   },
   // Bedtime Modal Styles
@@ -843,13 +859,14 @@ export const styles = StyleSheet.create({
   },
   bedtimeTitle: {
     fontSize: 24,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 8,
   },
   bedtimeSubtitle: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#666666',
     textAlign: 'center',
     marginBottom: 24,
@@ -863,7 +880,7 @@ export const styles = StyleSheet.create({
   },
   saveBedtimeButtonText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#0D0D0D',
   },
   skipBedtimeButton: {
@@ -873,6 +890,7 @@ export const styles = StyleSheet.create({
   },
   skipBedtimeButtonText: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#666666',
   },
   // Sleep Insight Modal Styles
@@ -892,12 +910,13 @@ export const styles = StyleSheet.create({
   },
   insightTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
     marginBottom: 20,
   },
   insightText: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#999999',
     textAlign: 'center',
     marginBottom: 12,
@@ -905,11 +924,11 @@ export const styles = StyleSheet.create({
   },
   insightHighlight: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
   },
   insightTime: {
     fontSize: 48,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: '#FFFFFF',
     marginVertical: 20,
   },
@@ -922,7 +941,7 @@ export const styles = StyleSheet.create({
   },
   insightButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#0D0D0D',
   },
   insightDismiss: {
@@ -931,6 +950,7 @@ export const styles = StyleSheet.create({
   },
   insightDismissText: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#666666',
   },
   // Settings Tab Styles
@@ -942,7 +962,7 @@ export const styles = StyleSheet.create({
   },
   settingsSectionHeader: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#818CF8',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -975,22 +995,24 @@ export const styles = StyleSheet.create({
   },
   settingsItemLabel: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#FFFFFF',
   },
   settingsItemValue: {
     fontSize: 16,
+    fontFamily: FONTS.medium,
     color: '#818CF8',
-    fontWeight: '500',
   },
   settingsItemSubtext: {
     fontSize: 13,
+    fontFamily: FONTS.regular,
     color: '#666666',
     marginTop: 2,
   },
   settingsItemChevron: {
     fontSize: 22,
+    fontFamily: FONTS.light,
     color: '#666666',
-    fontWeight: '300',
   },
   settingsDivider: {
     height: 1,
@@ -1003,7 +1025,7 @@ export const styles = StyleSheet.create({
   },
   settingsPickerLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#666666',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -1030,12 +1052,12 @@ export const styles = StyleSheet.create({
   },
   statsTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
   },
   statsCloseButton: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
   },
   statsScrollView: {
@@ -1052,12 +1074,13 @@ export const styles = StyleSheet.create({
   },
   statsEmptyTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
     marginBottom: 8,
   },
   statsEmptyText: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#666666',
     textAlign: 'center',
   },
@@ -1066,7 +1089,7 @@ export const styles = StyleSheet.create({
   },
   statsSectionTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#666666',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -1087,6 +1110,7 @@ export const styles = StyleSheet.create({
   },
   chartDuration: {
     fontSize: 11,
+    fontFamily: FONTS.regular,
     color: '#666666',
     marginBottom: 8,
   },
@@ -1107,12 +1131,13 @@ export const styles = StyleSheet.create({
   },
   chartDay: {
     fontSize: 12,
+    fontFamily: FONTS.regular,
     color: '#666666',
     marginTop: 8,
   },
   chartDayToday: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
   },
   statsCard: {
     backgroundColor: '#0D0D0D',
@@ -1125,11 +1150,12 @@ export const styles = StyleSheet.create({
   },
   statsMainValue: {
     fontSize: 48,
-    fontWeight: '300',
+    fontFamily: FONTS.light,
     color: '#FFFFFF',
   },
   statsMainLabel: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#666666',
     marginTop: 4,
   },
@@ -1145,12 +1171,13 @@ export const styles = StyleSheet.create({
   },
   statsSubLabel: {
     fontSize: 12,
+    fontFamily: FONTS.regular,
     color: '#666666',
     marginBottom: 4,
   },
   statsSubValue: {
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: FONTS.medium,
     color: '#FFFFFF',
   },
   statsBestWorst: {
@@ -1175,21 +1202,24 @@ export const styles = StyleSheet.create({
   },
   statsBWLabel: {
     fontSize: 12,
+    fontFamily: FONTS.regular,
     color: '#666666',
     marginBottom: 4,
   },
   statsBWValue: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
     marginBottom: 4,
   },
   statsBWDate: {
     fontSize: 12,
+    fontFamily: FONTS.regular,
     color: '#666666',
   },
   statsTotalNights: {
     fontSize: 14,
+    fontFamily: FONTS.regular,
     color: '#666666',
     textAlign: 'center',
   },
@@ -1200,7 +1230,7 @@ export const styles = StyleSheet.create({
   },
   insightsTitle: {
     fontSize: 28,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     color: '#FFFFFF',
     marginBottom: 24,
   },
@@ -1212,12 +1242,13 @@ export const styles = StyleSheet.create({
   },
   insightsCardLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: '#9999AA',
     marginBottom: 12,
   },
   insightsCardValue: {
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#FFFFFF',
   },
   insightsChart: {
@@ -1245,6 +1276,7 @@ export const styles = StyleSheet.create({
   },
   insightsBarLabel: {
     fontSize: 12,
+    fontFamily: FONTS.regular,
     color: '#9999AA',
     marginTop: 6,
   },
@@ -1262,12 +1294,13 @@ export const styles = StyleSheet.create({
   },
   insightsStatValue: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     color: '#FFFFFF',
     marginBottom: 4,
   },
   insightsStatLabel: {
     fontSize: 13,
+    fontFamily: FONTS.regular,
     color: '#9999AA',
   },
   insightsTipCard: {
@@ -1277,12 +1310,13 @@ export const styles = StyleSheet.create({
   },
   insightsTipLabel: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     color: '#818CF8',
     marginBottom: 6,
   },
   insightsTipText: {
     fontSize: 15,
+    fontFamily: FONTS.regular,
     color: '#FFFFFF',
     lineHeight: 22,
   },

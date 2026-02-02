@@ -1,7 +1,19 @@
-import { NativeModules, Platform, Linking } from 'react-native';
+import { NativeModules, Platform, Linking, Alert } from 'react-native';
 import type { Alarm, AlarmSound } from '../types';
+import { logger } from '../utils/logger';
 
 const { AlarmModule } = NativeModules;
+
+// GAP-21: Guard native module availability
+const isNativeAvailable = Platform.OS === 'android' && AlarmModule != null;
+
+let nativeAvailabilityWarned = false;
+function warnIfUnavailable(): void {
+  if (!isNativeAvailable && !nativeAvailabilityWarned) {
+    nativeAvailabilityWarned = true;
+    logger.warn('AlarmModule is not available on this platform or build');
+  }
+}
 
 /** Map AlarmSound names to native raw resource names */
 const SOUND_TO_RESOURCE: Record<AlarmSound, string> = {
@@ -21,6 +33,9 @@ export interface NativeAlarmService {
   checkExactAlarmPermission(): Promise<boolean>;
   getLaunchAlarmId(): Promise<string | null>;
   openAlarmPermissionSettings(): void;
+  openExactAlarmSettings(): void;
+  isIgnoringBatteryOptimizations(): Promise<boolean>;
+  saveAlarmsForReboot(alarmsJson: string): Promise<boolean>;
 }
 
 export const generateAlarmId = (): string => {
@@ -28,15 +43,14 @@ export const generateAlarmId = (): string => {
 };
 
 class NativeAlarmManager implements NativeAlarmService {
-  private isAndroid = Platform.OS === 'android';
-
+  // GAP-06: Check permission before scheduling and show alert if denied
   async scheduleAlarm(
     id: string,
     timestamp: number,
     soundName: string = 'alarm_gentle'
   ): Promise<boolean> {
-    if (!this.isAndroid) {
-      console.warn('Native alarms only supported on Android');
+    if (!isNativeAvailable) {
+      warnIfUnavailable();
       return false;
     }
 
@@ -44,75 +58,128 @@ class NativeAlarmManager implements NativeAlarmService {
       throw new Error('Alarm timestamp must be in the future');
     }
 
+    // GAP-06: Check exact alarm permission before scheduling
+    const hasPermission = await this.checkExactAlarmPermission();
+    if (!hasPermission) {
+      Alert.alert(
+        'Exact Alarm Permission Required',
+        'SoftWake needs permission to schedule exact alarms for reliable wake-ups. Please enable it in Settings.',
+        [
+          { text: 'Open Settings', onPress: () => this.openExactAlarmSettings() },
+          { text: 'Later', style: 'cancel' },
+        ]
+      );
+      return false;
+    }
+
     try {
       return await AlarmModule.scheduleAlarm(id, timestamp, soundName);
     } catch (error: any) {
       if (error.code === 'PERMISSION_DENIED') {
-        console.error('Exact alarm permission not granted');
+        logger.error('Exact alarm permission not granted');
       }
       throw error;
     }
   }
 
   async cancelAlarm(id: string): Promise<boolean> {
-    if (!this.isAndroid) return false;
+    if (!isNativeAvailable) {
+      warnIfUnavailable();
+      return false;
+    }
 
     try {
       return await AlarmModule.cancelAlarm(id);
     } catch (error) {
-      console.error('Failed to cancel native alarm:', error);
+      logger.error('Failed to cancel native alarm:', error);
       throw error;
     }
   }
 
   async stopAlarm(): Promise<boolean> {
-    if (!this.isAndroid) return false;
+    if (!isNativeAvailable) {
+      warnIfUnavailable();
+      return false;
+    }
 
     try {
       return await AlarmModule.stopAlarm();
     } catch (error) {
-      console.error('Failed to stop native alarm:', error);
+      logger.error('Failed to stop native alarm:', error);
       throw error;
     }
   }
 
   async snoozeAlarm(minutes: number = 9, soundName: string = 'alarm_gentle'): Promise<boolean> {
-    if (!this.isAndroid) return false;
+    if (!isNativeAvailable) {
+      warnIfUnavailable();
+      return false;
+    }
 
     try {
       return await AlarmModule.snoozeAlarm(minutes, soundName);
     } catch (error) {
-      console.error('Failed to snooze alarm:', error);
+      logger.error('Failed to snooze alarm:', error);
       throw error;
     }
   }
 
   async checkExactAlarmPermission(): Promise<boolean> {
-    if (!this.isAndroid) return true;
+    if (!isNativeAvailable) return true;
 
     try {
       return await AlarmModule.checkExactAlarmPermission();
     } catch (error) {
-      console.error('Failed to check alarm permission:', error);
+      logger.error('Failed to check alarm permission:', error);
       return false;
     }
   }
 
   async getLaunchAlarmId(): Promise<string | null> {
-    if (!this.isAndroid) return null;
+    if (!isNativeAvailable) return null;
 
     try {
       const id = await AlarmModule.getLaunchAlarmId();
       return id || null;
     } catch (error) {
-      console.error('Failed to get launch alarm id:', error);
+      logger.error('Failed to get launch alarm id:', error);
       return null;
     }
   }
 
   openAlarmPermissionSettings(): void {
-    if (!this.isAndroid) return;
+    if (!isNativeAvailable) return;
     Linking.openSettings();
+  }
+
+  // GAP-06: Open exact alarm settings directly
+  openExactAlarmSettings(): void {
+    if (!isNativeAvailable) return;
+    try {
+      AlarmModule.openExactAlarmSettings?.();
+    } catch {
+      Linking.openSettings();
+    }
+  }
+
+  // GAP-10: Check battery optimization status
+  async isIgnoringBatteryOptimizations(): Promise<boolean> {
+    if (!isNativeAvailable) return true;
+    try {
+      return await AlarmModule.isIgnoringBatteryOptimizations();
+    } catch {
+      return true; // Assume it's fine if we can't check
+    }
+  }
+
+  // GAP-01: Save alarms to native store for reboot rescheduling
+  async saveAlarmsForReboot(alarmsJson: string): Promise<boolean> {
+    if (!isNativeAvailable) return false;
+    try {
+      return await AlarmModule.saveAlarmsForReboot(alarmsJson);
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -121,7 +188,7 @@ export const nativeAlarm = new NativeAlarmManager();
 /**
  * Compute the next trigger timestamp for an alarm based on its hour, minute, and repeat days.
  */
-function getNextTriggerTimestamp(alarm: Alarm): number | null {
+export function getNextTriggerTimestamp(alarm: Alarm): number | null {
   if (!alarm.enabled) return null;
 
   const now = new Date();
@@ -189,15 +256,29 @@ export async function scheduleNativeAlarms(alarms: Alarm[]): Promise<void> {
     if (!alarm.enabled) continue;
 
     const timestamp = getNextTriggerTimestamp(alarm);
-    if (!timestamp) continue;
+    if (timestamp == null) continue;
 
     const soundResource = SOUND_TO_RESOURCE[alarm.sound] || 'alarm_gentle';
 
     try {
       await nativeAlarm.scheduleAlarm(alarm.id, timestamp, soundResource);
     } catch (error) {
-      console.error(`Failed to schedule native alarm ${alarm.id}:`, error);
+      logger.error(`Failed to schedule native alarm ${alarm.id}:`, error);
     }
+  }
+
+  // GAP-01: Save alarms to native store for reboot rescheduling
+  const enabledAlarms = alarms.filter(a => a.enabled);
+  if (enabledAlarms.length > 0) {
+    const alarmsData = enabledAlarms.map(a => ({
+      id: a.id,
+      hour: a.hour,
+      minute: a.minute,
+      days: a.days,
+      enabled: a.enabled,
+      sound: SOUND_TO_RESOURCE[a.sound] || 'alarm_gentle',
+    }));
+    await nativeAlarm.saveAlarmsForReboot(JSON.stringify(alarmsData));
   }
 }
 
